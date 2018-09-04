@@ -1,0 +1,1 @@
+DEFINITION MODULE MDProcessView;  EXPORT QUALIFIED InitProcessView, TerminateProcessView, ShowProcess;  PROCEDURE InitProcessView;    (*opens process window *)  PROCEDURE TerminateProcessView;    (*called by installed term-procedure *)  PROCEDURE ShowProcess(p: CARDINAL);END MDProcessView.

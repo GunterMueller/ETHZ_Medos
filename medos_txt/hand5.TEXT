@@ -1,0 +1,485 @@
+A c
+5.  The Editor
+C Y15 c
+Werner Winiger  4.8.82  (Version I.10)
+B Y20
+5.1.  Introduction
++
+The Lilith text editor is started by typing its name "edit" followed by RETURN.  It presents you the screen image shown in fig.1. 
+
+w410
+
+The screen is divided into a text area (38 lines of 91 characters), a scroll bar 
+at the left hand side, and a communication bar at the bottom.  The text area serves to 
+show you parts of the document you are working on.  With the help of the scroll 
+bar you may 
+position this document such that you see the desired sections.  In the communication 
+line you get messages from the editor, you have to enter file names and search strings 
+and you see the file name of the document being edited.  Not always visible is a 
+menu.  It appears as a box containing the keywords of the available commands.
+
+The input devices which allow you to give your commands to the program, are the 
+keyboard and the mouse.  Typing on the keyboard usually means that you want to insert 
+new characters into your text.  Exceptions are
+n x25
+- when the editor asks for a file name,
+- or for a search string,
+- or prompts you for an assertion such as  7write the document? [Y/N]0.
++
+The mouse is used to move a cursor around the screen (just by moving the mouse on the 
+desk) and to indicate
+n x25
+- where you want to insert text,
+- which characters are to be deleted,
+- which line should be scrolled to the top of the screen,
++
+and so on.  Furthermore, the three buttons of the mouse allow you to specify what 
+action the editor should perform at the position the mouse points to.  In the 
+editor's prompts, the left button is referred to as 7B10, the middle one as 7B20, 
+and the right button as 7B30.
+B Y20
+5.2.  Starting the Editor and Entry of New Text
++
+Let's follow now the procedure of preparing a new document (updating an old one 
+respectively):
++ Y1
+If you start the editor it prompts you for a file name.  Press RETURN to create a new 
+document.  You see now as the first and only "character" of the first line an 
+end-of-file mark in the form of a small (8 by 8 dot) square.  The blinking wedge 
+shaped mark to its left is called the 1caret0 and denotes the location where newly 
+typed text is inserted.
+
+You may now type in your text using
+n x25
+- RETURN to start a new line,
+- DEL to erase the character just keyed in,
+- TAB to get two blanks,
+- CAPS to capitalize the following alphabetic characters.
++ f3 
+On the current Lilith keyboard you have to hit CTRL-I or the key labeled 
+ON LINE to get a TAB.  The CAPS function is called by pressing CTRL-N or HOME,
+and HELP, which is mentioned later, is the name of CTRL-S, TAB or "?".
++
+If you reach the bottom of the text-window your document is scrolled up 
+automatically.  And after a while you will have a text, just as if you had entered a 
+file name at the beginning of the session instead of RETURN only.  So now we can 
+discuss the general case of dealing with an existing document.
+
+When typing the file name you don't have to enter the extension, if you want to 
+edit a Modula program.  MOD is the default extension which is appended automatically,
+if you terminate the file name with a period.
+B Y20
+5.3.  Positioning the Document
++
+When you enter a text, it is scrolled up such that you always see the last 38 lines of 
+the document;  if you get an old document from the disk you automatically see the 
+first page of that text.  But you may control which portion of the document you want 
+to be visible through the available text window.  [Refer to 5.10. to find out how 
+to split the text-area into several windows.]
+
+Positioning is done with the help of the mouse and the so called scroll bar:  Move the 
+mouse to the left until the cursor changes its form from an arrow "pointing to 
+north-west" to a double-arrow.  Attention: if you go too far the cursor wraps around, 
+but you may use the same effect to come back again.  The special form of the cursor in 
+the scroll bar indicates the special mode of the mouse:  it can now be used for 
+positioning.
+C Y15
+5.3.1.  Scrolling
++
+The cursor's location in the scroll bar corresponds to the text line on the same 
+hight.  It 
+is possible to make this line the first (top) of the window (1to scroll up0) by 
+pushing the left button, or to make it the bottom line (1scroll down0) by pushing 
+the right button.  Note that you still may adjust the mouse position while the button is 
+pressed because scrolling is not performed until you release it.
+
+As a consequence you may scroll up your document by one line by pressing
+the left button near the second line from the top,
+or scroll it down by 37 lines (go to the previous page) by pressing the right button
+near the top line.
+C Y15
+5.3.2.  Flipping
++
+By means of scrolling you may reach only the next (or previous) few lines of your 
+document easily from the current position.  But it is also desirable to make longer 
+jumps, like to go to the end of the text directly, or to the beginning, and so 
+on.  The editor offers such a facility: 1flipping0.  If you push the middle button 
+while the cursor is in the scroll bar, the document is repositioned as follows:  the
+number of lines of the text window beside the cursor is 
+considered to represent the whole document.  The cursor position within these lines 
+indicates which relative position within the document you want to select.  That means: 
+the cursor on the last line indicates a jump to the end of the document whereas the 
+cursor on 
+the 13th line of the 38 indicates a jump to the first third of the document.  Again, 
+the jump is executed only after you release the key.  [Refer to 5.9. to read how to 
+position the document at a searched string.]
+B Y20
+5.4.  Insert Characters at Different Locations
++
+Until now we have learned to inspect an old document or to enter a new one just by 
+typing its text sequentially.  Now we also want to be able to change a document.  First 
+of all, we would like to insert new text not only at the end of the document but at 
+arbitrary locations.  The blinking caret denotes the location where typed characters 
+are inserted.  Use the mouse to position the caret.  Move the arrow to the 
+desired place, press the left button and release 
+it again.  If you didn't hit well just try again (and again).  It is even allowed to 
+hold down the left button during the movement of the mouse.  Then you will see the caret 
+tracking the arrow.  And if you have led it to the correct position you release the left 
+button.  Now the editor is ready to receive the characters to be inserted.  If the
+caret sits in the middle of a word or a line and you type new text, then the rest of 
+the line is shifted to the right. There is no so-called "paint mode" since deleting
+is easy enough, as you see from the next section.  If a line becomes longer than 91 
+characters the superfluous ones are wrapped around, and displayed on the following
+line.  But they are viewed only as two lines, they still form one single line with
+no end-of-line inbetween.
+
+w430
+
+B Y20
+5.5.  Activating the Menu and Making a Selection
++
+This editor doesn't expect you to type commands but lets you point to them.  Since
+you would like to see as much text as possible the commands are not always 
+visible but only when you need them.  Press 
+the middle button (having the cursor anywhere in the 
+text area) and a list of commands will be displayed near the location of the arrow 
+overwriting temporarily your text.  This so-called 1menu0 will disappear as soon as
+you release the middle button.  So if you want to think or make a choice keep the button 
+depressed.  One of the commands is shown in reverse 
+video.  In order to 
+control which command should be selected you have to move the mouse.  Invoking a 
+command is achieved by releasing the middle button when the associated menu item is 
+inverted.  If you wish to release the middle button without causing any action, just 
+move the cursor outside the menu.  In any case the menu disappears and the (eventually) 
+hidden information appears again.  In case of an activated command it is executed 
+immediately.
+
+For the operations described in the following section you need to point to a 
+specific portion of your document.  In the editor's terminology, you have to make
+a 1selection0.
+Point with the 
+cursor to the first character which should be selected and press the right button.  This 
+character is now shown in reverse video.  This visual feedback denotes the selected 
+part of the document.  You may select one character or whole words or even several 
+lines:  Press the right button at the leftmost character to be selected, hold it down, 
+and move the cursor to the rightmost one.  Now the reversed portion tracks the cursor 
+until you release the button.  Making a selection is, like moving around the caret, an
+activity which you may use anytime and as often as you like.  The editor lets you
+1edit0 the operands of its operations at your convenience unless you are satisfied
+by the setup.
+
+B Y20
+5.6.  Delete, Move, or Copy Text
++
+I explained how to erase accidentally typed characters, namely with the DEL key.  But 
+this is not convenient for more than a few characters.  If you wish to correct 
+something longer you have to select this item first with the mouse.  Once the text 
+is selected as desired, it may be deleted.  This is achieved with the 
+help of the menu.  Choose the DELETE command, the selected text gets 
+deleted, and the rest of the text is shifted (and scrolled if necessary) in order to 
+fill the gap.
+
+The string you have deleted is kept in a buffer (until you delete another one).  It 
+is possible to reinsert the contents of that buffer anywhere in the document.  This may 
+be convenient in the following cases:
+x25
+- If you have deleted something erroneously.
+x50 Y1
+You may patch the situation by inserting the buffer again at the same location from 
+where you have deleted it.
+x25 Y1
+-If you like to move some part of your text to another place. 
+x50 Y1
+You just delete it at the source and insert it at the destination
+x25 Y1
+- If you want to copy a string from one place to another.
++
+How, exactly do you insert?  INSERT is just another command of the menu.  This means that 
+you have to use the middle button to get the menu and then move the mouse to select the 
+insert command.  When using the menu, you notice that it is always shown with that 
+command exhibited which you used last.  So executing the same command several times is 
+done by simply pushing the middle button shortly - once the desired command has been 
+selected.
+
+And where does the buffer get inserted?  Remember the blinking caret denoting the 
+location where typed characters are placed.  The same mark is also used here.  After 
+deletion of a string, the caret is located by the editor at the position of the 
+resulting gap.  So, restoring the string at the same place is very simple.  For the 
+purpose of moving text, however, you have to position the caret (as described
+in 5.4.) prior to activation of the insert command.
+
+Let's consider now copying a portion of a document.  Having in mind only the delete 
+and the insert facility it would be necessary to delete a string and then to insert 
+it twice: once at the origin and once at the destination.  To accomodate this, there 
+is an abbreviating command in the menu: SAVE.  It takes the selected text (which you 
+defined using the right button) and stores it in the buffer as if it had been 
+deleted.  But the text remains in the document and may now be copied with the help of 
+the insert command.  There is an even easier way to copy a string which may be used if
+the destination is visible on the screen:  set the caret to the destination and
+select the text to be copied;  now activate INSERT.  The string
+will implicitly be saved into the buffer and also inserted.
+B Y20
+5.7.  Termination of an Editing Session
++
+If you have entered a new document or updated an old one, you sometimes wish to stop 
+your work.  For that purpose the editor provides the CLOSE command.  It prompts you 
+with the question: 7write the document? [Y/N]0.  The 1No0 case is chosen if you want 
+to exit the editor without saving the document on the disk (e.g. if you used the 
+editor to inspect a file only).  To make sure that no work is lost this way the 
+program asks 7exit without writing the document? [Y/N]0.  And the editor stops only 
+if you insist by typing a "y".
+
+If you have confirmed that you wish the document being saved, the editor displays 
+the message 7what filename? [RETURN=backup input file]0 and the file name of the 
+document you worked with.  (This name is by default DK.Temp.MOD if you entered a new 
+document.)  You have now the choice to give the document a new name (what you 
+normally will do if it is a new one) or to store the current version with the same 
+name as the old one; in this case the old version is renamed: the extension of its 
+file name is changed to BAK.  In any case you will not lose the inputfile (if there is 
+any) of the edit process, so you may retrieve your 'edited' data again!  Note, 
+however, that when renaming the old document to ... .BAK the file with this name 
+(the grandfather of your current document) is deleted.
+
+According to the principle of 1not typing again what you have on your display 
+already0 the
+editor uses the selected text as file name if there is a selection when you terminate
+the session.  Reading the file name from the selection stops, however, when encountering
+a terminator such as you get control again before the file is actually written: complete
+or correct the name from the keyboard and confirm with RETURN that you are done.
+B Y20
+5.8.  Rescue from Abnormal Termination and Other Errors
++
+From 5.7. it follows that our new, edited document is not written onto the disk 
+while you work with it.  The document is indeed represented only by a data structure
+in main memory.  This makes the case of a hard- or software error dangerous.  Is all 
+your work lost in such a case?  Of course not.  You may start the editor again and 
+watch what happens:  It remembers all you did and repeats the whole editing process 
+again.  You may stop this so-called 1replay0 by typing any key, continue by typing 
+some key again, or terminate the interrupted replay process and switch to normal 
+editing with ESC.  This feature is implemented by writing all commands which you
+give either with the mouse or the keyboard to a file (Edit.I10.RPL) and deleting this
+file if you terminate editing normally.  Hint: it is wise to save the document onto 
+the disk after a successful replay.
+B Y20
+5.9.  Searching
++
+The FIND command allows you to search for a string which you entered from the keyboard 
+or which you selected on the screen with the mouse.  When activating the command you 
+have the following three possibilities:
+x25
+You may search for the same string as used before:  Press the left button.
+This is convenient for finding all occurrences of a string.
+
+You want to search for another string of which you have a
+copy somewhere on the screen:  Select this string, by using the right button, before 
+activating the find command.  This way you don't have to type the searched string.
+
+You enter the search string from the keyboard,
+terminating it with RETURN.  The editor finds the next
+occurrence of the string (not containing RETURN).
++
+If you forgot what the previous search string was you may ask the editor by typing
+the HELP key instead of a new search string.  Searching is performed sequentially 
+forward through the document starting from the position of the caret.  If the string 
+can't be found a message is displayed; else the document is positioned 
+such as the line containing the string is visible in the middle of the text 
+window.  The caret is positioned right after the found string.  Therefore, it may be 
+used as starting point to search for the next occurrence.
+B Y20
+5.10.  Working with Windows
++
+In the previous chapters we have considered the whole text area as one window through 
+which you may inspect 38 adjacent lines of your document.  The editor features, 
+however, multiple windows for the same document and multiple documents in 
+parallel.  Fig. 3 shows a screen with two documents of which the first has three windows.
+
+w415
+
+C Y15
+5.10.1.  Open a Window
++
+To open an additional window within an already existing document you first have to activate the 
+WINDOW command and then determine, using the mouse and the left button, where the 
+separating bar has to be drawn.  Again, it is allowed to hold the left button down 
+and then move the mouse:  the bar follows the cursor as long as you don't go out of 
+bounds.  A window must contain at least five lines.  If you have opened several 
+windows for a document you may position them independently, and inspect different 
+parts of the document jointly despite the fact that there are hidden parts of text 
+between them.  You're also allowed to extend a selection over window bars.  The invisible
+part inbetween is treated as being selected too.
+C Y15
+5.10.2.  Open a Document
++
+It is furthermore desirable and possible to have windows connected with other 
+documents:  Use the right button instead of the left button when creating the 
+window.  The bar, which is drawn then, is not dashed like for a normal window 
+but it is a solid line.  And the program asks you for a file name, just like at the 
+beginning (where you implicitly created the first document).  For the second and 
+the subsequent documents the default extension is no longer MOD but LST.  And there 
+is also a default name, namely the name of the document opened before.  The editor 
+has the same conventions for entering file names as described in section 4.2.3.  Having
+a string selected when opening a new document causes these characters to be interpreted
+as the file name. 
+C Y15
+5.10.3.  Change the Size of a Window
++
+In the window command, the left button has another meaning if it is pressed while the 
+cursor is located above the last line of a window.  The cursor then picks up the 
+associated bar and moves it up or down following the mouse.  This implies that you 
+may change the size of an existing window.
+C Y15
+5.10.4.  Close a Window or a Document
++
+If you want to remove a window you have to activate the CLOSE command.  If there 
+is more than one window the editor prompts you 7close which window? [B1]0.  You have 
+to denote the window by moving the cursor inside it and pressing the left button.
+
+Closing the uppermost window of a document, even if there are some more open, is 
+associated with closing the whole document.  You have then to perform the necessary 
+dialog as described in 5.7. in order to define whether that document should be stored 
+on the disk and, if so, which name it should have.  If the document to be closed is not
+the topmost one then the editor doesn't doublecheck in case you indicate closing
+without writing.
+
+Care has to be taken if there are documents which have, besides the extension, the 
+same file name (e.g. x.MOD and x.DEF).  They cannot all be renamed to get the extension
+BAK.  Therefore, the editor uses the extension BAK for the first which you back
+up, BAL for the second, and so on.
+
+Closing the topmost document, even if there are some more open, is associated with 
+leaving the editor.  If you want to do this without writing the document you 
+have to assert your intention.  Writing is only applicable to the document you close
+explicitly.  So, if there are further documents when you close the topmost one, they 
+are implicitly closed too, but without writing.
+
+After you have closed a document using the default backup scheme, which renamed the
+inputfile to ... .BAK, you must not try to do a replay in case 
+of a crash without renaming the files to the names they had at the beginning of 
+the interrupted editing session.
+B Y20
+5.11.  Accelerators
++
+Editors are usually too simple and not handsome enough for experts 1or0 too complex
+for beginners or casual users.  The method to delete, copy, or move text as described
+in 5.6. is intended to be easily understandable but it requires
+invoking the menu once or twice after the selection is made and the caret 
+positioned.  For skilled users, the editor features a faster way to achieve the
+same results.  While holding down the right button to define a selection you may also
+associate a 1type0 with the selection.  There are delete-, copy-, and 
+move-selections.  If you release the right button and the selection has such a type,
+the editor performs the appropriate operation:  with a delete-selection the 
+selected text just disappears, with a copy-selection it is copied to the location of
+the caret, and with a move-selection it is deleted at the source and inserted at the
+destination (denoted by the caret again).
+
+There are two ways to define the type of a selection: from the keyboard or with mouse
+buttons.  If you prefer to use your left hand and the keyboard proceed as 
+follows:  Hit "d" for 1delete0, "c" for 1copy0, or "s" (because of its neighborhood 
+to d and c) for 1move0.  You will receive a visual feedback.  A delete-selection has
+a dashed bottom edge, a copy-selection a dashed top, and a move-selection has both
+(because you delete 2and0 copy).  The selection type is a toggle, so typing "d"
+twice turns on and off again the delete-selection.  Furthermore you are allowed to
+switch from one type to another.  Hitting "d" followed by "c" produces a 
+copy-selection.  Remember to keep depressing the right button all the 
+time.  If you prefer 
+to use the left and the middle button of the mouse instead you have to know the
+following encoding:  the left button corresponds to the delete-selection, the middle 
+one to the copy-selection, and both together to the move-selection.
+
+But before you can do some practising, your user profile must be edited in order to 
+direct the editor to support one way of getting selection types or the other.  Read
+the following section on the function and format of the user profile.
+B Y20
+5.12.  User Profile and User Guidance
++
+A key word of today's editors is 2user taylorability0.  The Lilith editor has a few
+functions which may be turned on or off via the file 1User.Profile0.  This text
+file is mainly a list of options which should be active for a given user.  It may be
+edited as desired and when starting the editor the next time the options will be set
+accordingly.  If no profile is available the editor generates a default file containing:
+= x25
+"Editor"
+'Version'           I.10
+'SelectionFeedBack' inverted
+'Caret'             after insertion
+'Umlaut'            per default
++
+The meaning of these entries is that you are using version I.10 of the editor, that you
+want to see selected text in reverse video, that you would like the caret to be moved
+behind an inserted (or copied or moved) string, and that the editor should start in
+the umlaut mode.  If you don't like a particular option (e.g. those bright rectangles
+for selection feedback) you may delete the associated entry from the user profile
+and the editor will behave the way you specify.  Note, however, that it is not possible
+to get version 1.8 of the editor running by editing the version number!  This entry
+merely serves to indicate to a newly released editor that you just have started it the
+first time and that it should give you some advice on the differences between this and
+the previous version.  Section 5.13. tells you more about 
+umlauts.  The other options will be discussed here.  
+
+The alternative to selection feedback by inverse video is a triangular mark at the left 
+end
+of the selection and a similar mark at the right end thus avoiding large differences
+in the brightness level of your screen.  As a side effect it is no longer possible
+to have the selection types which are described in 5.11.
+
+Not moving the caret behind inserted portions means leaving it where it is, in front of
+them.  This location is at least visible on the screen in all cases, whereas the caret 
+would disappear in the other mode if you insert more than n lines having the insertion 
+point located less than n lines from the bottom of the window.  In such a case the editor
+moves the caret only to the end of the last line of the window!
+
+Further user profile entries known by the editor are:
+= x25
+'SelectionTypes'    from keyboard
+'SelectionTypes'    from buttons
+'HardCopy'          enabled
+'Font'              GACHA20
++
+The function of the first two has already been explained in 5.11.  You are allowed
+to have both options enabled together.
+
+The hardcopy entry enables the CTRL-P key.  This command writes the current bitmap
+on the file Edit3i0.PICT,  3i0 = 0,1,...  Such pictures may be processed by 
+hardcopy programs.  Pressing the middle and then also the left 
+button is equivalent to CTRL-P.
+
+The font feature is mainly for demonstration purposes.  The editor may be used with
+any fixed-pitch font.  Having a larger font but fewer lines and less characters is
+useful if you want to project the screen image and still get readable information.  As
+a side effect of changing the font, the editor assumes selection feedback by
+reverse video and ignores selection types.
+
+1User guidance0 is tentatively achieved by 
+the dialog with the user through the message window which is done in a somewhat
+systematic manner:  There are messages indicating the state of the system during
+long lasting operations (like FIND).  There are messages prompting the user for an
+action (like entering a filename).  The possible options for such a situation are
+enumerated in square brackets.  There are error messages informing the user about
+an action the system cannot handle.  And finally there are messages indicating the 
+last operation performed.  This last type of messages appears only on request (to
+be given with the HELP key).
+
+The other general purpose key is ESC.  ESC lets you escape from almost any 
+situation.  It cancels the selection or the selection type, it cancels entering 
+a file name or a
+search string, and it lets you also return from opening or closing a document.
+B Y20
+5.13.  Special Characters
++
+The editor supports six umlaut characters: Ä, Å, Ç, É, Ñ, and Ö.  The following table
+shows their encoding on a disk file and by which keys they may be generated:
+t150,250,350.
+- f0
+ Ä  200B  SHIFT-"@"
+ Å  201B  SHIFT-"^"
+ Ç  202B  SHIFT-"\"
+ É  203B  "@"
+ Ñ  204B  "^"
+ Ö  205B  "\"
++
+But as
+you see it is also possible, to generate the ASCII characters `, ~, |, @, ^, and
+\.  The three keys "@", "^", and "\" may be switched to ASCII mode back and forth 
+with CTRL-T or the key labeled
+FORMAT.  You may control the mode in which the editor should start by an entry
+in the user profile.

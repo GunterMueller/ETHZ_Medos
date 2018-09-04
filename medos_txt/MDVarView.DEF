@@ -1,0 +1,19 @@
+DEFINITION MODULE MDVarView; (*P. Karrer 7.7.82*)
+
+  FROM SYSTEM IMPORT WORD;
+  FROM MDDataHandler IMPORT TypeDescPtr, Ident;
+  FROM WindowHandler IMPORT Window;
+
+  EXPORT QUALIFIED
+    ShowVar, DisplayVar, VarViewResetLevel;
+
+  PROCEDURE ShowVar(name: Ident; type: TypeDescPtr; addr: CARDINAL);
+
+  PROCEDURE DisplayVar(name: Ident; addr: CARDINAL; value: WORD;
+                       type: TypeDescPtr; w: Window);
+    (* displays a line with name, value (or size), (typename or) type
+       and addr in window w *) 
+
+  PROCEDURE VarViewResetLevel;
+
+END MDVarView.

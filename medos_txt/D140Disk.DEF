@@ -1,0 +1,58 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          D140Disk:                   *
+*                                      *
+*          Privat driver in MEDOS.     *
+*                                      *
+*          Version 2  27.05.81         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE D140Disk;
+
+  FROM SYSTEM IMPORT
+    WORD;
+
+  FROM FileSystem IMPORT
+    Response;
+ 
+  EXPORT QUALIFIED 
+    drives,
+    tracks,
+    sectors,
+    sectorsize,
+    DiskReset, DiskStatus,
+    DiskRead, DiskWrite; 
+
+   
+  CONST
+    drives = 2;
+    tracks = 784; 
+    sectors = 48;
+    sectorsize = 128;
+
+ 
+  PROCEDURE DiskReset; 
+
+  PROCEDURE DiskStatus(): Response; 
+
+  PROCEDURE DiskRead(drive, diskadr: CARDINAL;  
+                     VAR buffer: ARRAY OF WORD;
+                     VAR res: Response); 
+
+  PROCEDURE DiskWrite(drive, diskadr: CARDINAL;
+                      VAR buffer: ARRAY OF WORD;
+                      VAR res: Response); 
+
+
+END D140Disk.

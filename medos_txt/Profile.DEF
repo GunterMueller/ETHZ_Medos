@@ -1,0 +1,16 @@
+DEFINITION MODULE Profile;  (*NW 8.7.82*)
+  EXPORT QUALIFIED
+    OpenProfile, FindKey, GetString, GetFileName, GetNumber, CloseProfile;
+
+  PROCEDURE OpenProfile(title: ARRAY OF CHAR);
+
+  PROCEDURE FindKey(key: ARRAY OF CHAR);
+
+  PROCEDURE GetString(VAR s: ARRAY OF CHAR);
+
+  PROCEDURE GetFileName(VAR name: ARRAY OF CHAR; ext: ARRAY OF CHAR);
+
+  PROCEDURE GetNumber(VAR x: CARDINAL);
+
+  PROCEDURE CloseProfile;
+END Profile.

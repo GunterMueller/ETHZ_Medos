@@ -1,0 +1,1 @@
+DEFINITION MODULE DefaultFont; (* Werner Winiger 4.10.80                  ===========  *)  FROM SYSTEM IMPORT ADDRESS;  EXPORT QUALIFIED defaultFont;  VAR    defaultFont: ADDRESS;END DefaultFont.

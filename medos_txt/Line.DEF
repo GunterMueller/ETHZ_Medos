@@ -1,0 +1,38 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          Line:                       *
+*                                      *
+*          Line reads from and writes  *
+*          to the asyncronous V24      *
+*          connection. <cr><lf> is     *
+*          converted to <eol> and      *
+*          vice versa.                 * 
+*                                      *
+*          Version 2   5.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE Line;
+
+  EXPORT QUALIFIED
+    Read, BusyRead, Write;
+
+  PROCEDURE Read(VAR ch: CHAR);
+
+  PROCEDURE BusyRead(VAR ch: CHAR);
+
+
+  PROCEDURE Write(ch: CHAR);
+
+END Line.
+

@@ -1,0 +1,18 @@
+(* Inspection of either memory or files
+   but of size 64k words*)
+
+DEFINITION MODULE Inspect; (*Carl Binding; modified by Ch. J.*)
+  EXPORT QUALIFIED 
+    InitInspect, TerminateInspect, 
+    Show, Installate, CalledAddr;
+  
+  PROCEDURE Show(startaddr: CARDINAL);
+  
+  PROCEDURE Installate(a: ARRAY OF CHAR; p: PROC);
+  PROCEDURE CalledAddr(): CARDINAL;
+
+  PROCEDURE InitInspect;
+  PROCEDURE TerminateInspect;
+
+END Inspect.
+

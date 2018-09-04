@@ -1,0 +1,182 @@
+A c
+3.  Running Programs
+C Y15 c
+Svend Erik Knudsen  15.5.82
++
+This chapter describes, how programs are called with the 1command interpreter0 of the Medos-2 operating system.  An often used sequence of program calls may be controlled by a 1command file0.
+B Y20
+3.1.  The Command Interpreter
++
+The 1command interpreter0 is the main program of the Medos-2 operating system.  After the initialization of the operating system, the command interpreter 1repeatedly0 executes the following tasks
+x25
+-  Read and interprete a command, i.e. read a program name and activate the corresponding program.
+
+-  Report errors which occured during program execution.
++
+In order to keep the resident system small, a part of the command interpreter is implemented as a nonresident program.  But, this fact is transparent to most users of Medos-2.
+C Y15
+3.1.1.  Program Call
++
+The command interpreter indicates by an asterisk 2*0 that it is ready to accept the next command.  Actually there exists only one type of commands:  1program calls0.
+
+To call a program, type a program name on the keyboard and terminate the input by either hitting the RETURN key or pressing the space bar.
+= x25
+*directory
++
+The program with the typed name is activated, i.e. loaded and started for execution.  If the program was executed correctly, the command interpreter returns with an asterisk and waits for the next program call.  If some load or execution error occured, an error message is displayed, before the asterisk appears.
+= x25
+*direx
+ program not found
+*directory
+                                1directory program is running7
+*
++
+A 1program name0 is an identifier or a sequence of identifiers separated by periods.  An identifier itself begins with a letter (2A0 .. 2Z0, 2a0 .. 2z0) followed by further letters or digits (200 .. 290).  At most 16 characters are allowed for a program name, and capital and lower case letters are treated as distinct.
+- x25 t170.
+ProgramName  =  Identifier { "." Identifier } .
+Identifier  =  letter { letter | digit } .
++
+Programs are loaded from files on the disk cartridge.  In order to find the file from which the program should be loaded, the Medos-2 loader converts the program name into a file name.  It inserts the medium name 7DK0 at the beginning of the program name, appends an extension 7OBJ0, and searches for a file with this name.  If no such file exists, the loader inserts the prefix 7SYS0 into the file name and searches for a file with this name.
+x25 t210.
+Accepted program name  7directory0
+First file name  7DK.directory.OBJ0
+Second file name  7DK.SYS.directory.OBJ0
++
+If neither of the searched files exists, the command interpreter displays the error message 7program not found0.
+C Y15
+3.1.2.  Typing Aids
++
+The command interpreter provides some typing aids which make the calling of a program more convenient.  Most typing errors are handled by simply 1ignoring unexpected characters0.  Further, there are the 1automatic extension0 of a typed character sequence and some 1special keys0.
+w15
+1Automatic Extension0
+
+The command interpreter automatically extends an initially typed character sequence to the name of an 1existing0 program.  This means that a long program name may be identified by a few characters.  If several programs exist whose names start with the typed character sequence, the sequence is only extended up to the point where the names start to differ.  In this case, further characters are needed for identification.  The input of a program name must be terminated by either hitting the RETURN key or pressing the space bar.  
+
+The command interpreter needs a few seconds to find all the names of available programs.  Therefore, automatic extension is only possible after that time.  If a command is typed very fast (or probably before the asterisk is displayed), the meaning of the termination character may be different.  Termination with RETURN means that the command should be accepted as it is, termination with the space bar means that the command interpreter should try to extend the character sequence to a program name before accepting it.
+w15
+1Special Keys0
+
+While typing a program name, the command interpreter also accepts some special keys which are executed immediately.
++ x25
+2?0
+x50 Y2
+1HELP character0.  It causes the display of a list of all programs, whose names start with the same character sequence as the typed one.  At the end of the list, the already typed part of the program name is displayed again, and the rest of the program name is accepted.
++ x25
+2DEL0
+x50 Y2
+Delete the last typed character.
++ x25
+2CTRL-X0
+x50 Y2
+1Cancel0.  Delete the whole character sequence which has been typed
++ x25
+2CTRL-L0
+x50 Y2
+1Form feed0.  Clear the screen and accept a new command at the upper left corner of the screen.  This key must be typed just 1behind an asterisk0.  It is not accepted within a character sequence.
++ x25
+2ESC0
+x50 Y2
+Terminate the execution of the command interpreter.
++ x25
+2CTRL-C0
+x50 Y2
+1Kill character0.  This key may be typed at any time.  The currently executed program will be 1killed0 and a 1dump0 will be written on the disk cartridge.  The dump may be inspected with program 1debug0.  Obviously, the CTRL-C key is built into Medos-2 in order to help the programmer during unavoidable debugging activities.  But, CTRL-C is 2NOT THE NORMAL WAY TO LEAVE A PROGRAM0.
+C Y15
+3.1.3.  Loading and Execution Errors
++
+Messages about loading and execution errors are displayed on the screen.  They are reported either by the command interpreter, the resident system, or the running program itself.
+w15
+1Loading Errors0
+
+It is possible that a called program cannot be loaded.  It may be that the corresponding file is not found on the disk cartridge, that some separate modules imported by the program are not found, or that the module keys of the separate modules do not match.
+
+The following types of loading errors may be reported
+x25 t240.
+call error  1parameter error at program call0
+program not found  10
+program already loaded  1a program must not be loaded twice0
+module not found  10
+incompatible module  1a module found with a wrong module key0
+not enough space  1program needs too much memory space0
+too many modules  1maximal number of loaded modules exceeded0
+illegal type of code  1code of a module is not from the same generation0
+error in filestructure  1a file may be damaged0
+some file error  10
+some load error  1maximal number of imported, not yet loaded modules exceeded0
++ `w15
+1Execution Errors0
+
+If a program is successfully loaded, it is possible that the execution of the program is terminated abnormally.  There may occur a run time overflow, the program may call the standard procedure HALT, or the user may even kill the program by typing CTRL-C on the keyboard.  In all of these cases, the operating system first causes the memory contents to be dumped on the 1dump files0 of the disk cartridge.  The dump files may be inspected with program 1debug0.
+
+The following types of execution errors may be reported
+x25 t240.
+stopped  1program was killed by CTRL-C0
+stack overflow  1available memory space exceeded0
+REAL overflow  10
+CARDINAL overflow  10
+INTEGER overflow  10
+range error  10
+address overflow  1illegal pointer access0
+function return error  1function not terminated by a RETURN statement0
+priority error  1call of a procedure on lower priority0
+HALT called  1standard procedure HALT was called0
+assertion error  1program terminated with an assertion error0
+instruction error  1illegal instruction, i.e. the code may be overwritten0
+warning  1program detected some unexpected errors -- no memory dump0
++ w15
+1Errors Reported by the Command Interpreter0
+
+The error messages displayed by the command interpreter are intended to be self-explaining.  They are written just before the asterisk which indicates that the next command will be accepted.
+w15
+1Errors Reported by the Resident System0
+
+The messages directly displayed by the resident system (and possibly other non-resident modules and programs), appear according to following example
+= x25
+- Storage.ALLOCATE: heap overflow
++ x25
+This example indicates that procedure 7ALLOCATE0 in module 7Storage0 had detected that the requested space could not be allocated in the heap.
++
+Some modules (e.g. module 1Program0) indicate on which execution level the error was detected by the number of hyphens in front of the message.
+w15
+1Errors Reported by Other Programs0
+
+It is possible that other programs report loading and execution errors in their own manner.  In this case, try to understand the displayed error message.  If the memory image has been dumped on the dump files, it is also possible to find the reason for the failure with the debugger.
+B Y20
+3.2.  Command Files
++
+It is possible that a sequence of program executions must be repeated several times.  Consider for example the transfer of a set of files between two computers.  Instead of typing all commands interactively, it is in this case more appropriate to substitute these commands as a batch to the procedures which normally read characters from the keyboard.  For this purpose the operating system allows the substitution of 1command files0.
+
+A command file must contain exactly the same sequence of characters which originally would be typed on the keyboard.  This includes the commands to call programs and the answers given in the expected dialog with the called programs.  To initialize the command file input, the program 1commandfile0 must be started.  This program prompts for the name of a command file (default extension is 7COM0) and substitutes the accepted file to the input procedures.
+= x25
+*commandfile
+ Command file> transfer.COM
+*                               1input characters are read from the command file,7
+                                1instead of from the keyboard7
++
+After all characters have been read from the substituted command file, the input is read again from the keyboard.  Reading from the command file is also stopped when a program does not load correctly or a program terminates abnormally.
+
+Except for one exception, command files 1must not be nested0.  If the call of program 1commandfile0 and the subsequent file name are the last information on the current command file, it is possible to start a new command file.  In all other cases the execution of the current command file would fail.
+B Y20
+3.3.  Program Loading
++
+2This chapter is intended to be read by programmers only.0
+
+Programs are normally executed on the top of the resident operating system.  After the program name is accepted by the command interpreter, the loader of Medos-2 loads the program into the memory and, after successful loading, starts its execution.  Medos-2 also allows a program to call another program.  This chapter describes, how programs are loaded on the top of Medos-2.  More details about program calls, program loading, and program execution are given in the description of module 1Program0 (see chapter 9.2.).
+
+Usually, a program consists of several separate modules.  These are the 1main module0, which constitutes the main program, and all modules which are, directly or indirectly, imported by the main module.
+
+Upon compilation of a separate module, the generated code is written on an 1object file0 (extension 7OBJ0).  This file can be accepted by the loader of Medos-2 directly.  A program is ready for execution if it and all imported modules are compiled.  To execute the program, the main module must be called.  The loader will first load the main module from the substituted object file, and afterwards the imported modules from their corresponding object files.
+
+The names of the object files belonging to the imported modules are derived from (the first 16 characters of) the module names.  If a first search is not successful, a prefix 7LIB0 is inserted into the file name and the loader tries again to find the object file.
+x25 t210.
+Module name  7BufferPool0
+First file name  7DK.BufferPool.OBJ0
+Second file name  7DK.LIB.BufferPool.OBJ0
++
+A module cannot be loaded twice.  If an imported module is already loaded with the resident system (e.g. module 1FileSystem0), the loader connects the program with this module.
+
+If a module cannot be loaded because of a missing object file, a loading error is signalled.  The loader also signals an error if a module found on an object file is incompatible with the other modules.  For correct program execution, it is important that the references across the module boundaries refer to the same interface descriptions, i.e. the same symbol file versions of the separate modules.  The compiler generates for each separate module a 1module key0 (see chapter 7.7.) which is also known to the importing modules.  For successful loading, all module keys refering to the same module must match.
+
+After termination of the program, the memory space occupied by the previously loaded modules is released.  This also happens with the resources used by the program (e.g. heap, files).
+
+The loading speed may be improved if a program is 1linked0 before its execution.  The linker collects the imported modules in the same manner as the loader and writes them altogether on one file.  It is also possible, to substitute a user selected file name for an imported module to the linker.  If a program is linked, the loader can read all imported modules from the same object file, and therefore it is not necessary to search for other object files.  For a description of program 1link0 refer to chapter 6.7.

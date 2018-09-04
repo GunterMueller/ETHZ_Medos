@@ -1,0 +1,247 @@
+;-------------------------------------
+;
+;    MACROS
+;
+;-------------------------------------
+
+        .MACRO  POP
+        PLA
+        STA     %1
+        PLA     
+        STA     %1+1
+        .ENDM
+        
+        
+        .MACRO  PUSH
+        LDA     %1+1
+        PHA
+        LDA     %1
+        PHA
+        .ENDM
+        
+
+        .PROC   CINIT,1
+;--------------------------------------
+;
+;  INITIALIZE UART WITH BAUD RATE
+;  CALCULATION
+;
+;  COUNTVALUE=16385 - 14318200
+;                     ---------
+;                     64*BAUDRATE
+;
+;--------------------------------------
+
+RETURN  .EQU    0
+BRL     .EQU    2
+BRH     .EQU    3
+RESULTL .EQU    4
+RESULTH .EQU    5
+TEMPL   .EQU    6
+TEMPH   .EQU    7
+ACREGL  .EQU    0C0B8
+ACREGH  .EQU    0C0B4
+ACST    .EQU    0C0BE
+ACRD    .EQU    0C0BF
+ACWD    .EQU    0C0BF
+ACCO    .EQU    0C0BE
+
+
+
+        POP     RETURN
+        POP     BRL
+        LDA     #0
+        STA     RESULTL
+        STA     RESULTH
+DV10    SEC
+        LDA     BRL
+        SBC     #0A
+        STA     BRL
+        LDA     BRH
+        SBC     #00
+        STA     BRH
+        BMI     DVEND
+        
+        INC     RESULTL
+        BNE     DV10
+        INC     RESULTH
+        BNE     DV10
+DVEND   LDA     #40    
+        STA     BRH
+        LDA     #01    
+        STA     BRL
+        LDA     #57
+        STA     TEMPH
+        LDA     #64
+        STA     TEMPL
+DVBR    SEC
+        LDA     TEMPL
+        SBC     RESULTL
+        STA     TEMPL
+        LDA     TEMPH
+        SBC     RESULTH
+        STA     TEMPH
+        BMI     DVBREND
+        DEC     BRL
+        BNE     DVBR
+        DEC     BRH
+        BNE     DVBR
+DVBREND LDA     BRL
+        STA     ACREGL
+        LDA     BRH
+        STA     ACREGH
+        LDA     #03
+        STA     ACCO
+        LDA     #91
+        STA     ACCO
+
+        
+        
+        PUSH    RETURN
+        RTS
+         
+
+        
+        
+        
+        
+        .PROC   PUTC,1
+;------------------------------
+;
+;   WRITE A CHARACTER TO CONSOLE
+;
+;-------------------------------
+RETURN  .EQU    0
+ACST    .EQU    0C0BE
+ACWD    .EQU    0C0BF
+
+        POP     RETURN
+WAIT    LDA     ACST
+        AND     #02
+        BEQ     WAIT
+        PLA
+        STA     ACWD
+        PLA
+        PUSH    RETURN
+        RTS
+
+
+        .FUNC   GETC,0
+
+;--------------------------------------
+;
+;    READ A CHARACTER FUNCTION
+;
+;-------------------------------------
+RETURN  .EQU    0
+ACST    .EQU    0C0BE
+ACRD    .EQU    0C0BF
+
+        POP     RETURN
+        PLA
+        PLA
+        PLA
+        PLA
+WAITP   LDA     ACST
+        AND     #01
+        BEQ     WAITP
+        LDA     #00
+        PHA
+        LDA     ACRD
+        PHA
+        PUSH    RETURN
+        RTS
+        
+        
+        .PROC   GETBLOCK,0
+;-----------------------------
+;
+;  READ A BLOCK OF 512 + CHECKSUM
+;
+;----------------------------------
+        .PUBLIC BUFFER
+ACST    .EQU    0C0BE
+ACWD    .EQU    0C0BF
+ACRD    .EQU    0C0BF
+CKSUM   .EQU    6
+        LDX     #0
+        STX     CKSUM
+;  WRITE A W TO START THE BLOCK COMING
+WAIT    LDA     ACST
+        AND     #02
+        BEQ     WAIT
+        LDA     #57
+        STA     ACWD
+WAIT1   LDA     ACST
+        AND     #01
+        BEQ     WAIT1
+        LDA     ACRD
+        STA     BUFFER,X
+        CLC
+        ADC     CKSUM
+        STA     CKSUM
+        INX     
+        BNE     WAIT1
+WAIT2   LDA     ACST
+        AND     #01
+        BEQ     WAIT2
+        LDA     ACRD
+        STA     BUFFER+100,X
+        CLC
+        ADC     CKSUM
+        STA     CKSUM
+        INX     
+        BNE     WAIT2
+WAIT3   LDA     ACST
+        AND     #01
+        BEQ     WAIT3
+        LDA     ACRD
+        SEC
+        SBC     CKSUM
+        STA     BUFFER+200
+        RTS
+        
+        .PROC   PUTBLOCK,0
+;------------------------------------
+;
+;   SEND A BLOCK OF 512 + CHECKSUN
+;
+;---------------------------------
+        
+        .PUBLIC BUFFER
+ACST    .EQU    0C0BE
+ACWD    .EQU    0C0BF
+CKSUM   .EQU    6
+        
+        LDX     #0
+        STX     CKSUM
+WAIT    LDA     ACST
+        AND     #02
+        BEQ     WAIT
+        LDA     BUFFER,X
+        STA     ACWD
+        CLC
+        ADC     CKSUM
+        STA     CKSUM
+        INX
+        BNE     WAIT
+WAIT1   LDA     ACST
+        AND     #02
+        BEQ     WAIT1
+        LDA     BUFFER+100,X
+        STA     ACWD
+        CLC
+        ADC     CKSUM
+        STA     CKSUM
+        INX
+        BNE     WAIT1
+WAIT2   LDA     ACST
+        AND     #02
+        BEQ     WAIT2
+        LDA     CKSUM
+        STA     ACWD
+        RTS
+      
+        
+        .END
+

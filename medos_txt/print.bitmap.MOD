@@ -1,0 +1,414 @@
+MODULE printBitmap;   
+(*----------------------------------------------------------------------------------
+  Beat Frey
+
+  This program is used to print a bitmap on the CANNON laserbeamprinter.
+  The bitmap is read from a file of type 'PICT', usually generated
+  using 'WriteBitmap' of the module 'BitmapIO'.
+  
+IMPLEMENTATION:
+  The program reads a filename and checks the filetype. At the same time the
+  dimension of the bitmap is read and checked whether it requires more memory
+  space than allowed (bmmax). Enough space is allocated on the heap and the
+  bitmap read in. The printer is activated. Two bandbuffers are provided, one
+  of them is prepared for printing while the printerinterface reads and prints
+  the other one (DMA). Preparing includes enlarging of the picture by 2
+
+  2.7.81 / 1.3.82 / 25.6.82 V4 / 11.10.82 variable dimension bitmaps
+  83/07/06: WW adjusted for DISER printer
+-----------------------------------------------------------------------------------*)
+
+FROM SYSTEM           IMPORT ADDRESS,WORD,ADR,TSIZE;
+FROM Storage          IMPORT ALLOCATE,DEALLOCATE,Available;
+FROM FileSystem       IMPORT File,Response,Reset,
+                             Lookup, Length;
+FROM FileNames        IMPORT ReadFileName;
+FROM Screen           IMPORT Bitmap;
+FROM BitmapIO         IMPORT ReadBitmap;
+FROM Terminal         IMPORT Write,Read,WriteString,WriteLn;
+FROM ScreenResources0 IMPORT UseBitmap;
+FROM ByteBlockIO      IMPORT ReadBytes;
+
+CONST initheight     = 64;      (*bandbuffer height: lower + upper buffer*)
+      length         = 2048;    (*bandbuffer length*)
+      bandwidth      = (initheight DIV 2) DIV 2;
+      printerchannel = 40b;     (*printerinterface hardware address*)
+      printerdata    = 41b;     (*printerinterface hardware address*)
+      printercom     = 42b;     (*printerinterface hardware address*)
+      bmmax          = 33280;   (*max length of bitmap*)
+
+TYPE  Filename = ARRAY[0..31] OF CHAR;
+      Channel =   [40B..50B];
+
+
+VAR   pag,leftmargin,card:     CARDINAL;
+      ch:                      CHAR;
+      ok,esc:                  BOOLEAN;
+      status:                  BITSET;
+      badr,bim,adr:            ADDRESS;
+      lowerbuffer,upperbuffer: ADDRESS;  (*pointers to the two band buffers*)
+      enlmat:                  ARRAY[0..255] OF CARDINAL; (*enlarge matrix*)
+      bmp,bufferpointer:       ADDRESS;  (*pointer to bitmap;pointer to buffer*)
+      bmfile:                  File;     (*bitmap file*)
+      bmw,bmh:                 CARDINAL; (*bitmap dimensions*)
+      startpage:               CARDINAL; (*space on top of page*)
+
+
+  PROCEDURE GetPicture(VAR bmfile: File; VAR ok,esc: BOOLEAN);
+  VAR  fn:        Filename;
+
+  BEGIN 
+    ok := TRUE;
+    REPEAT
+      WriteString('Input Picturefile  > ');
+      ReadFileName(fn,'DK..PICT'); Read(ch); WriteLn;
+      esc := ch = 33c;
+      IF NOT esc THEN
+        Lookup(bmfile,fn,FALSE);
+        ok := bmfile.res = done;
+        IF NOT ok THEN 
+          WriteString('Picturefile not found');WriteLn;
+        END;
+      END;(*not esc*)
+    UNTIL ok OR esc;
+  END GetPicture;
+
+  PROCEDURE GetDimensions(VAR bmw,bmh: CARDINAL;VAR bmfile: File;VAR ok: BOOLEAN);
+  TYPE BitmapFileHeader = RECORD
+         key,
+         version,
+         width,
+         height : CARDINAL;
+       END;
+
+  CONST
+    FileKey = 341b;
+    CurrentVersion = 0;
+
+  VAR header: BitmapFileHeader;
+      hi,lo,actualLength: CARDINAL;
+      
+
+  BEGIN
+    Reset(bmfile);
+    ok := bmfile.res = done;
+    IF ok THEN
+      Length(bmfile,hi,lo);
+      IF hi > 1 THEN
+        ok := FALSE;
+        WriteString('WRONG FILETYPE');WriteLn;
+      ELSE
+        ReadBytes(bmfile,ADR(header),2*TSIZE(BitmapFileHeader),actualLength);
+        IF actualLength < 2*TSIZE(BitmapFileHeader) THEN
+          ok := FALSE; WriteString('WRONG FILETYPE');WriteLn;
+        ELSE
+          WITH header DO
+            IF key = FileKey THEN
+              ok := ok AND (width MOD 16 = 0) AND (version = CurrentVersion);
+            ELSE
+              width := 768;
+              height := 592;
+              Reset(bmfile);
+            END;(*key=filekey*)
+          END;(*with header*)
+        END;(*actual length ok*)
+      END;(*file not too long*)
+    END;(*file successfully reset*)
+    IF ok THEN
+      bmw := header.width;
+      bmh := header.height;
+      card := 113-(bmw DIV 8);(*113: experimental value*)
+      WriteString('Leftmargin ([0..');
+      Wdec(card);
+      WriteString('] default:');
+      Wdec(card DIV 2);
+      WriteString(') > ');
+      leftmargin:= 9 + Rdec(card DIV 2); WriteLn;
+      IF leftmargin > (9 + card) THEN leftmargin :=  9 + card END;
+      WriteString('Topmargin (default: 5) > ');
+      startpage := Rdec(5) + 9; WriteLn;
+    ELSE
+      WriteString('FILE ERROR');WriteLn;
+    END;
+  END GetDimensions;
+
+
+  PROCEDURE PUT(chan: Channel; value: CARDINAL);
+    CODE(241b);
+  END PUT;
+
+  PROCEDURE GET(chan: Channel;VAR value: BITSET);
+    CODE(240b);
+  END GET;
+
+  PROCEDURE WAIT(w: CARDINAL);
+  VAR i,k: CARDINAL;
+  BEGIN
+    FOR i:= 1 TO w DO
+      FOR k:= 1 TO 10000 DO END
+    END
+  END WAIT;
+
+  PROCEDURE Wdec(c: CARDINAL);
+  VAR m,h,i: CARDINAL;
+      b:   BOOLEAN;
+  BEGIN
+    m:= 10000; b:= FALSE;
+    FOR i:= 0 TO 4 DO
+      h:= c DIV m;
+      IF h <> 0 THEN b:= TRUE; END;
+      IF b THEN 
+        Write(CHR(h + ORD('0')));
+        c:=c - h*m;
+      END;
+      m:= m DIV 10;
+    END;
+    IF NOT b THEN Write('0'); END;
+  END Wdec;
+
+  PROCEDURE Rdec(de:CARDINAL):CARDINAL;
+  CONST max = 1000;
+  VAR s,i: CARDINAL;
+  BEGIN
+    s:= 0; i:= 0;
+    REPEAT
+      Read(ch); 
+      IF (ch >= '0') AND (ch <= '9') AND (s < max) THEN
+        Write(ch);
+        s:=s*10 +(ORD(ch)-ORD('0')); INC(i);
+      ELSIF ch = 33c THEN (*esc*)
+        i := 0;
+      ELSIF ch = 177c THEN (*delete*)
+        IF i > 0 THEN
+          DEC(i); s := s DIV 10; Write(ch);
+        END;
+        ch := '0';(*we don't want to exit the repeat loop!*)
+      END;
+    UNTIL (ch < '0') OR (ch > '9');
+    IF i=0 THEN Wdec(de); RETURN de ELSE RETURN s; END;
+  END Rdec ;
+
+  PROCEDURE Enlarge(e: CARDINAL):CARDINAL;
+  VAR r,s,p: CARDINAL;
+  BEGIN
+    s:=0; p:=3;
+    WHILE e <> 0 DO
+      r:= e MOD 2;
+      e:= e DIV 2;
+      s:= s + r*p;
+      p:= p*4;
+    END;
+    RETURN s;
+  END Enlarge;
+
+  PROCEDURE Getstatus():BITSET;
+  VAR v:BITSET;
+      count1,count2: CARDINAL;
+  BEGIN
+    count2:= 0;
+    REPEAT
+      count1:= 0;
+      PUT(43b,0); 
+      REPEAT GET(43b,v);
+        INC(count1)
+      UNTIL (v * {0,15} = {}) OR (count1 > 10000);
+      INC(count2);
+    UNTIL (v * {0,15} = {}) OR (count2 > 10);
+    IF count2 > 10 THEN
+      WriteString('No Printer-Status available'); WriteLn; HALT;
+    END;
+    RETURN v;
+  END Getstatus;
+
+  PROCEDURE Activate;
+  VAR stat,stat1: BITSET;
+  BEGIN GET(40b,stat);
+    IF NOT (13 IN stat) THEN
+      stat1 := Getstatus();
+      IF 8 IN stat1 THEN
+        WriteString(' activate ');
+        PUT(42b,1);
+        REPEAT GET(40b,stat) UNTIL 13 IN stat;
+        PUT(42b,2);
+      ELSIF 7 IN stat1 THEN 
+        WriteString(' activate ');
+        REPEAT GET(40b,stat) UNTIL 13 IN stat;
+      ELSE
+        WriteString('Not able to activate'); HALT
+      END;
+      WriteString(' done ');WriteLn;
+    END;
+    PUT(printercom,2);
+  END Activate;
+
+  PROCEDURE Diagnostic(s: BITSET);
+  VAR s1:BITSET;
+  BEGIN
+    IF (s - {9,10,11,12,13,14}) <> {} THEN
+      Write(36C);
+      IF (10 IN s) AND (11 IN s) AND (12 IN s) THEN
+        WriteString('Paper cassette missing ! ');
+        REPEAT
+          s:= Getstatus();
+        UNTIL NOT(1 IN s) AND NOT((10 IN s) AND (11 IN s) AND (12 IN s));
+        WriteString('ok '); WriteLn;
+      ELSIF 1 IN s THEN
+        WriteString('No paper! ');
+        REPEAT
+          s:= Getstatus();
+        UNTIL NOT(1 IN s) AND NOT((10 IN s) AND (11 IN s) AND (12 IN s));
+        WriteString('ok '); WriteLn;
+      END;
+      IF 7 IN s THEN
+        WriteString('Waiting..');
+        REPEAT
+          s:= Getstatus();
+        UNTIL NOT(7 IN s);
+        WriteString('ok '); WriteLn;
+      END;
+      IF  2 IN s THEN WriteString('renew premix !'); WriteLn END;
+      IF  3 IN s THEN WriteString('Paper jam !'); WriteLn END;
+      IF  4 IN s THEN WriteString('renew toner !'); WriteLn END;
+      IF  5 IN s THEN WriteString('Printer error. Call service.'); WriteLn END;
+      s1 :=  Getstatus();
+      IF ({2,3,4,5} * s1) <> {} THEN 
+        WriteString('Printer error'); WriteLn;
+        HALT
+      END;
+      Activate;
+    END;
+  END Diagnostic;
+
+  PROCEDURE StartPrint;
+  CONST startpage = 14;
+  VAR stat: BITSET;
+      timeout,timeout1: CARDINAL;
+
+    PROCEDURE Startdrum;
+    BEGIN
+      timeout := 0; timeout1 := 0;
+      PUT(40b,0);
+      REPEAT 
+        GET(40b,stat);
+        IF timeout1 < 60000 THEN INC(timeout1) ELSE timeout1 := 0; INC(timeout) END;
+      UNTIL (14 IN stat) OR (timeout > 12) ;
+    END Startdrum;
+
+  BEGIN
+    Startdrum;
+    IF timeout > 12 THEN
+      REPEAT
+        Diagnostic(Getstatus());
+        Startdrum;
+      UNTIL timeout <= 12;
+    END;
+    WAIT(startpage);
+  END StartPrint;
+
+  PROCEDURE PrintBitmap;
+
+  VAR   i,k,l:       CARDINAL;
+        scrn:           Bitmap;
+        scradr:         ADDRESS;
+        t:              BOOLEAN;
+        bmindex,insert: ADDRESS;
+
+    PROCEDURE FillBlock(bufferpointer: ADDRESS);
+    TYPE  line = ARRAY[0..127] OF WORD;
+          linepointer = POINTER TO line;
+    VAR ins1:           ADDRESS;
+        card:           CARDINAL;
+        l0,l1:          linepointer;
+
+    BEGIN
+      ins1:= bufferpointer + leftmargin;
+      l0:= bufferpointer; l1:= bufferpointer + 128;
+      FOR i:=1 TO bandwidth DO
+        FOR k:= 1 TO bmw DIV 16 DO
+          card:= enlmat[CARDINAL(bmindex^) DIV 256];
+          ins1^:= WORD(card(*enlmat[CARDINAL(bmindex^) DIV 256]*)); INC(ins1);
+          card:= enlmat[CARDINAL(bmindex^) MOD 256];
+          ins1^:= WORD(card(*enlmat[CARDINAL(bmindex^) MOD 256]*)); INC(ins1); INC(bmindex);
+        END;
+        l1^:= l0^;
+        IF i < bandwidth THEN 
+          ins1 := bufferpointer + leftmargin + i*256;
+          l0:= ADDRESS(l0) +256; l1:= ADDRESS(l1) +256;
+        END;
+      END;
+    END FillBlock;
+  
+  BEGIN  (*PrintBitmap*)
+    bmp := bmp DIV 4 * 4;
+    UseBitmap(scrn,bmw,bmh,bmp DIV 4,(bmw DIV 16)*bmh,t);
+    ReadBitmap(bmfile,scrn);
+    Activate;
+    IF t AND (Getstatus() = BITSET(156b)) THEN
+      scradr := ADDRESS(bmp);
+      bmindex:= scradr;
+      badr:= bim;
+      FillBlock(lowerbuffer);
+      Activate;
+      StartPrint;
+      REPEAT GET(printerchannel,status) UNTIL 15 IN status;
+      PUT(printerdata,badr);
+      FOR l:= 1 TO (bmh DIV 16) - 1 DO
+        IF badr = bim THEN
+          INC(badr,1024);
+          FillBlock(upperbuffer);
+        ELSE
+          badr:= bim;
+          FillBlock(lowerbuffer);
+        END;
+        REPEAT GET(printerchannel,status) UNTIL 15 IN status;
+        PUT(printerdata,badr);
+      END;
+      INC(pag);
+      IF Getstatus() <> BITSET(156b) THEN WriteString('Check Printer');WriteLn; END;
+    END;
+  END PrintBitmap;
+
+    
+BEGIN
+  (*prepare enlarge lookup table*)
+  FOR card := 0 TO 255 DO enlmat[card] := Enlarge(card) END;
+  WriteLn;pag := 0;
+
+    ok := TRUE;
+    GetPicture(bmfile,ok,esc);
+    IF esc THEN ok := FALSE END;
+    IF ok THEN
+      GetDimensions(bmw,bmh,bmfile,ok);
+      IF ok THEN
+        IF (bmmax DIV bmh) < (bmw DIV 16) THEN (*size not ok*)
+          WriteString(' BITMAP TOO BIG');
+        ELSE
+          IF Available(bmh*(bmw DIV 16)+3) THEN
+            ALLOCATE(bmp,bmh*(bmw DIV 16)+3);
+          ELSE
+            WriteString(' NO SPACE FOR BITMAP');ok := FALSE;WriteLn;
+          END;
+          IF Available(initheight*((length+15) DIV 16)+3) THEN
+            ALLOCATE(bufferpointer,initheight*((length+15) DIV 16)+3);
+          ELSE
+            WriteString(' NO SPACE FOR BUFFER');ok := FALSE;WriteLn;
+          END;
+          IF ok THEN
+            adr := bufferpointer;
+            FOR card := 0 TO initheight*((length+15) DIV 16)+2 DO (*clear buffer*)
+              adr^ := WORD(0);
+              INC(adr);
+            END;
+            bufferpointer := bufferpointer DIV 4 * 4;
+            lowerbuffer:= bufferpointer;
+            upperbuffer:= bufferpointer + 4096;
+            bim:= bufferpointer DIV 4;
+            PrintBitmap;
+          END;(*allocations ok*)
+        END;(*size ok*)
+      END;(*dimensions ok*)
+    END;(*getfile ok*)
+  IF pag = 1 THEN
+    WriteString(' 1 Page printed.');WriteLn;
+  END;
+END printBitmap.

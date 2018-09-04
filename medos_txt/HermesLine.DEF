@@ -1,0 +1,68 @@
+DEFINITION MODULE HermesLine; (* WW 8.6.83 from JH hermes 3/5/82 *)
+
+FROM SYSTEM IMPORT
+  WORD;
+FROM FileSystem IMPORT
+  Response;
+
+EXPORT QUALIFIED
+  PacketResult, PacketType, bufsize, buffer, packet, FileName, FileCommand, string,
+  transmit, receive;
+ 
+CONST
+  bufsize = 128;
+
+TYPE
+  PacketType = (AreYouHere,   (* inquire on activity *)
+                LastBadBlock, (* the last block was somehow bad *)
+                FileAction,   (* Lookup, Close,...*)
+                FileActionResult,(* result of Lookup, Close, ... *)
+                FileData,     (* data block *)
+                NextData,     (* give me next data *)
+                Abort,        (* abort session *)
+                Kill);        (* kill the whole session *)
+ 
+  PacketResult = ( pOK,       (* packet was received OK *)
+                   badflag,   (* bad start flag *)
+                   ptimeout,  (* timeout *)
+                   badpacket, (* length err, flag err *)  
+                   badxsum);  (* xsum error *)
+ 
+  FileName = ARRAY [0..32] OF CHAR;
+ 
+  FileCommand = (OpenWrite, OpenRead, CloseF, CheckOpen(*check if file already exists*) );
+ 
+  buffer = ARRAY [0..bufsize-1] OF WORD;
+ 
+  string = ARRAY [0..79] OF CHAR;
+ 
+  onetwothree = (one, two, three);  (* help type *)
+ 
+  packet = RECORD
+             length : CARDINAL; (* the length of the packet *)
+             CASE onetwothree OF
+             one  : bytes : ARRAY [0..2*bufsize+10] OF CHAR  |
+             two  : words : ARRAY [0..bufsize+5] OF CARDINAL|
+             three: pxsum  : CARDINAL; (* checksum up to length *)
+                    seqnr  : CARDINAL;
+                    CASE pt : PacketType OF
+                    AreYouHere:  IamMaster : BOOLEAN    |
+                    LastBadBlock:                       |
+                    FileAction: Fcmd : FileCommand;
+                                fn   : FileName         |
+                    FileActionResult : Fres : Response  |
+                    FileData :  nrbytes : CARDINAL;
+                                buff:     buffer        |
+                    NextData :                          |
+                    Abort    : msg: string              |            
+                    Kill:
+                    END
+              END
+            END (* packet *);
+
+PROCEDURE transmit (VAR p : packet);
+
+PROCEDURE  receive (VAR p : packet; VAR res : PacketResult;
+                    timeouton : BOOLEAN);
+
+END HermesLine.

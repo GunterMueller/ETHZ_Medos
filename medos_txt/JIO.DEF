@@ -1,0 +1,54 @@
+(*********************************************)
+(*                                           *)
+(*                                           *)
+       DEFINITION MODULE JIO;
+(*                                           *)
+(*          Author Jirka Hoppe               *)
+(*      Institut fuer Informatik             *)
+(*             ETH Zurich                    *)
+(*            Switzerland                    *)
+(*                                           *)
+(*           version 4/11/82                 *)
+(*                                           *)
+(*********************************************)
+
+FROM SYSTEM IMPORT WORD;
+
+EXPORT QUALIFIED 
+(*CONST*)        versionJIODef, EOL, ESC, DEL,
+(*VAR*)          versionJIOMod, delim,
+(*PROCEDURE*)    ReadEcho, StopByKey, WaitForKey, ReadOct, WriteOct, ReadHex, WriteHex,
+                 ReadDec, WriteDec, WriteStringLn, Assert;
+
+CONST
+  versionJIODef = '4/11/82';
+  EOL = 36c;
+  ESC = 33c;
+  DEL = 177c;
+
+VAR versionJIOMod : ARRAY [0..7] OF CHAR;
+    delim : CHAR; (* delimiter from  ReadOct ReadHex ReadDec *)
+
+PROCEDURE ReadEcho(VAR ch : CHAR);
+
+PROCEDURE StopByKey():BOOLEAN;
+
+PROCEDURE WaitForKey();
+
+PROCEDURE ReadOct(VAR n : WORD);
+
+PROCEDURE WriteOct(n : WORD; length : CARDINAL);
+
+PROCEDURE ReadHex(VAR n : WORD);
+
+PROCEDURE WriteHex(n:WORD; length : CARDINAL);
+
+PROCEDURE ReadDec(VAR w :WORD);
+
+PROCEDURE WriteDec(w : WORD; length : CARDINAL);
+
+PROCEDURE WriteStringLn(s : ARRAY OF CHAR);
+
+PROCEDURE Assert(b : BOOLEAN; s : ARRAY OF CHAR);
+
+END JIO.

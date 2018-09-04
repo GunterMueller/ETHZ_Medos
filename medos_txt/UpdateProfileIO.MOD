@@ -1,0 +1,127 @@
+IMPLEMENTATION MODULE UpdateProfileIO; (* WW 17.6.83 *)
+
+FROM Monitor IMPORT
+  Time;
+FROM HermesLine IMPORT
+  FileName;
+FROM Terminal IMPORT
+  Write, WriteString, WriteLn;
+FROM String IMPORT
+  Copy, first, last;
+FROM UserProfile IMPORT
+  LookupUserProfile, CloseUserProfile, SetReadPos, SetWritePos, 
+  ReadItem, WriteGroupId, WriteItemId, WriteItem;
+FROM UpdateStringIO IMPORT
+  String40, StartReadingFromString, ReadFromString,
+  StartWritingToString, WriteToString, GetString;
+FROM UpdateTimeIO IMPORT
+  ReadTime, WriteTime;
+
+
+CONST
+  MaxDirectories = 9;
+  
+TYPE
+  DirDescriptor = RECORD
+    name: FileName;
+    date: Time;
+  END;
+
+VAR
+  directories: CARDINAL;
+  directory: ARRAY [1..MaxDirectories] OF DirDescriptor;
+
+
+PROCEDURE GetDateFromString (str: String40; VAR date: Time; VAR ok: BOOLEAN);
+VAR ch: CHAR;
+BEGIN
+  ch := ' ';
+  StartReadingFromString(str);
+  ReadTime(date,ok,ch,ReadFromString);
+END GetDateFromString;
+
+
+PROCEDURE OpenProfile (VAR ok: BOOLEAN);
+BEGIN
+  LookupUserProfile(FALSE,ok);
+  IF NOT ok THEN
+    WriteString(" ---- User.Profile not found");
+    WriteLn;
+    RETURN;
+  END;
+  SetReadPos("Update","",ok);
+  IF NOT ok THEN
+    WriteString(' ---- no "Update"-entry in userprofile');
+    WriteLn;
+    RETURN;
+  END;
+END OpenProfile;
+
+
+PROCEDURE ReadDirectories (VAR number: CARDINAL);
+VAR
+  itemId,value: String40;
+  ok,
+  eof: BOOLEAN;
+BEGIN
+  directories := 0;
+  LOOP
+    ReadItem(itemId,value,eof);
+    IF eof THEN EXIT; END;
+    INC(directories);
+    IF directories > MaxDirectories THEN
+      WriteString(" ---- too many directories in the userprofile");
+      WriteLn;
+    END;
+    WITH directory[directories] DO
+      Copy(name,itemId,first,last);
+      GetDateFromString(value,date,ok);
+      IF NOT ok THEN
+        WriteString(" ---- illegal date on userprofile: ");
+        WriteString(value);
+        WriteLn;
+        DEC(directories);
+      END;
+    END;
+  END;
+  number := directories;
+END ReadDirectories;
+
+
+PROCEDURE GetDirectoryName (d: CARDINAL; VAR str: ARRAY OF CHAR);
+BEGIN
+  Copy(str,directory[d].name,first,last);
+END GetDirectoryName;
+
+
+PROCEDURE GetDirectoryTime (d: CARDINAL; VAR date: Time);
+BEGIN
+  date := directory[d].date;
+END GetDirectoryTime;
+
+
+PROCEDURE MarkUserProfile (d: CARDINAL; date: Time);
+VAR
+  ok: BOOLEAN;
+  alfaDate: String40;
+BEGIN
+  StartWritingToString;
+  WriteTime(date,WriteToString,0c);
+  GetString(alfaDate);
+  SetWritePos("Update",directory[d].name,ok);
+  IF ok THEN
+    WriteItem(alfaDate);
+    directory[d].date := date;
+  ELSE
+    HALT;
+  END;
+END MarkUserProfile;
+
+
+PROCEDURE CloseProfile;
+BEGIN
+  CloseUserProfile;
+END CloseProfile;
+
+
+END UpdateProfileIO.

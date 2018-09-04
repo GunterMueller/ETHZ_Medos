@@ -1,0 +1,234 @@
+MODULE GraphicDemo;    (* JTN 25.7.79 *)
+                       (*     modified ChJ 10.Nov.79 *)
+                       (*     version to the resident display WW 27.5.80 *)
+                       (*     modified ChJ 25.10.80 *)
+                       (*     menu-selection introduced ChJ 12.6.82 *)
+                       (*     pictures built in WW 10.06.83 *)
+ (*$T-*) (*$R-*)
+
+  FROM SYSTEM IMPORT
+    ADDRESS, WORD, ADR;
+  FROM FileSystem IMPORT
+    File, Response, Lookup, Close;
+  FROM Terminal IMPORT
+    BusyRead, Read, ReadAgain, WriteString, Write, WriteLn;
+  FROM FileNames IMPORT
+    ReadFileName;
+  FROM Screen IMPORT 
+    BlockDescriptor, Mode, Bitmap, GetDefaultBitmap,
+    Replicate, BlockTransfer, GetMaxBlock;
+  FROM CursorStuff IMPORT
+    MenuSelection, xpos, ypos, GetMouse, buttons;
+  FROM BitmapIO IMPORT
+    ReadBitmap;
+
+  CONST
+    FF = 14c;
+    ESC = 33c;
+    EOL = 36c;
+
+  TYPE 
+    Pattern = 
+      RECORD
+        size: CARDINAL;
+        words: ARRAY [1..16] OF BITSET;
+      END;
+
+  VAR
+    maxblk: BlockDescriptor;
+    defBMD: Bitmap;
+    ch: CHAR;
+
+    maxx, maxy: CARDINAL;
+    lastcur, cursor: BlockDescriptor; 
+    pattern: Pattern;
+    mode: Mode;
+
+  PROCEDURE SetCursor(VAR pat: Pattern);
+    (* check position of mouse and make a cursor *)
+  BEGIN 
+    GetMouse;
+    IF xpos<= maxx THEN cursor.x := xpos ELSE cursor.x := maxx END;
+    IF ypos<= maxy THEN cursor.y := ypos ELSE cursor.y := maxy END;
+    pattern := pat;
+    Replicate(defBMD, cursor, invert, pattern);
+    lastcur := cursor;
+  END SetCursor;
+
+  PROCEDURE TrackCursor;
+     (* leave desired trail behind cursor *)
+  BEGIN 
+    GetMouse;
+    IF xpos<= maxx THEN cursor.x := xpos ELSE cursor.x := maxx END;
+    IF ypos<= maxy THEN cursor.y := ypos ELSE cursor.y := maxy END;
+    IF NOT((lastcur.x = cursor.x) &  (lastcur.y = cursor.y)) THEN
+       Replicate(defBMD, lastcur, mode, pattern);
+       Replicate(defBMD, cursor, invert, pattern);
+       lastcur := cursor;
+    END;
+  END TrackCursor;
+
+  PROCEDURE ClrCursor;
+  BEGIN
+    Replicate(defBMD, lastcur, mode, pattern);
+  END ClrCursor;
+
+  PROCEDURE Menu;
+  BEGIN
+    WriteString("MENU commands:"); WriteLn;
+    WriteString("  help:  writes this introduction"); WriteLn;
+    WriteString("  draw:  enters Draw-mode"); WriteLn;
+    WriteString("  bblt:  enters BlockTransfer-mode"); WriteLn;
+    WriteString("  clear: clears the screen"); WriteLn;
+    WriteString("  exit:  exits the program"); WriteLn;
+    WriteLn;
+    WriteString('Draw-mode commands:'); WriteLn;
+    WriteString('  left button:   means cursor tracking'); WriteLn;
+    WriteString('  middle button: painting'); WriteLn;
+    WriteString('  right button:  erasing;'); WriteLn;
+    WriteLn;
+    WriteString('BlockTransfer-mode commands:'); WriteLn;
+    WriteString('  left button:   defines the lower left'); WriteLn;
+    WriteString('  middle button: the upper right corner'); WriteLn;
+    WriteString('                 of a bitblock and'); WriteLn;
+    WriteString('  right button:  transfers that block.'); WriteLn;
+    WriteLn;
+    WriteString('any key shows again the menu'); WriteLn;
+    WriteString('have fun !'); WriteLn;
+  END Menu;
+
+  PROCEDURE DrawMode; 
+    VAR curpat: Pattern;
+  BEGIN
+    curpat.size := 16; 
+    curpat.words[1] := {6..9};
+    curpat.words[2] := {4..11};
+    curpat.words[3] := {3..12};
+    curpat.words[4] := {2..13};
+    curpat.words[5] := {1..14};
+    curpat.words[6] := {1..14};
+    curpat.words[7] := {0..15};
+    curpat.words[8] := {0..15};
+    curpat.words[9] := {0..15};
+    curpat.words[10] := {0..15};
+    curpat.words[11] := {1..14};
+    curpat.words[12] := {1..14}; 
+    curpat.words[13] := {2..13};
+    curpat.words[14] := {3..12};
+    curpat.words[15] := {4..11};
+    curpat.words[16] := {6..9};
+    mode := invert;
+    cursor.h := 16; cursor.w := 16;
+    lastcur.h := 16; lastcur.w := 16;
+    maxx := maxblk.w-cursor.w; maxy := maxblk.h-cursor.h;
+    SetCursor(curpat);
+    LOOP
+      TrackCursor;
+      IF buttons<>0 THEN
+        IF ODD(buttons) THEN mode := invert
+        ELSIF ODD(buttons DIV 4) THEN mode := erase
+        ELSIF ODD(buttons DIV 2) THEN mode := paint
+        END;
+      END;
+      BusyRead(ch);
+      IF ch <> 0C THEN ReadAgain; EXIT; END;
+    END;
+    ClrCursor;
+  END DrawMode;
+
+  VAR x1, y1, x2, y2: CARDINAL; 
+
+  PROCEDURE BlockTransferMode;
+    VAR blk, dest: BlockDescriptor;
+        smallcur: Pattern;
+  BEGIN
+    smallcur.size := 4; 
+    smallcur.words[1] := {1,2};
+    smallcur.words[2] := {0,1,2,3};
+    smallcur.words[3] := {0,1,2,3};
+    smallcur.words[4] := {1,2};
+    cursor.h := 4; cursor.w := 4;
+    lastcur.h := 4; lastcur.w := 4;
+    maxx := maxblk.w-cursor.w; maxy := maxblk.h-cursor.h;
+    mode := invert;
+    SetCursor(smallcur);
+    LOOP TrackCursor;
+      IF ODD(buttons)THEN 
+        x1 := cursor.x; y1 := cursor.y;
+      ELSIF ODD(buttons DIV 2) THEN
+        x2 := cursor.x; y2 := cursor.y;
+      ELSIF ODD(buttons DIV 4) THEN 
+        blk.x := x1; blk.y := y1;
+        dest.x := cursor.x; dest.y := cursor.y;
+        IF y2<y1 THEN y2 := y1 END;
+        IF x2<x1 THEN x2 := x1 END;
+        dest.h := y2-y1; dest.w := x2-x1;
+        IF (dest.y+dest.h)>maxblk.h THEN
+           dest.h := maxblk.h-dest.y
+        END; 
+        IF (dest.x+dest.w)>maxblk.w THEN
+          dest.w := maxblk.w-dest.x
+        END; 
+        ClrCursor;
+        BlockTransfer(defBMD, dest, replace, defBMD, blk);
+        SetCursor(smallcur);
+      END; 
+      BusyRead(ch);
+      IF ch <> 0C THEN ReadAgain; EXIT; END;
+    END;
+    ClrCursor;
+  END BlockTransferMode;
+
+  PROCEDURE LoadPicture;
+    VAR f: File;
+        fN: ARRAY [0..31] OF CHAR;
+        ch: CHAR;
+  BEGIN
+    LOOP
+      WriteString(' load which picture ? (ESC / filename) ');
+      Read(ch);
+      IF ch = ESC THEN RETURN;
+      ELSE ReadAgain;
+      END;
+      ReadFileName(fN,'DK.Chillon.PICT'); 
+      Read(ch);
+      IF fN[0] = 0c THEN
+        IF ch = ESC THEN RETURN;
+        ELSIF (ch = ' ') OR (ch = EOL) THEN fN := 'DK.Chillon.PICT'; EXIT;
+        ELSE WriteLn;
+        END;
+      ELSE 
+        EXIT;
+      END;
+    END;
+
+    Lookup(f,fN,FALSE);
+    IF f.res = done THEN
+      Write(FF);
+      ReadBitmap(f,defBMD);
+      Close(f);
+    ELSE
+      WriteString(' not found');
+      WriteLn;
+    END;
+  END LoadPicture;
+
+BEGIN 
+  x1 := 0; x2 := 0; y1 := 0; y2 := 0;
+  Write(FF); Menu;
+  GetDefaultBitmap(defBMD); GetMaxBlock(maxblk, defBMD);
+  LOOP
+    CASE MenuSelection("*MENU| help| draw| bblt| pict| clear| exit ") OF
+      2: Write(FF); Menu |
+      3: DrawMode  |
+      4: BlockTransferMode |
+      5: LoadPicture |
+      6: Write(FF) |
+      7: EXIT
+    ELSE 
+    END; 
+    BusyRead(ch); 
+    IF ch<>0c THEN Write(ch) END;
+  END; 
+  Write(FF) 
+END GraphicDemo.

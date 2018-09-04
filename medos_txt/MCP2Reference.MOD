@@ -1,0 +1,303 @@
+(****************************************
+*                                       *
+*     MODULA-2 Multi-Pass Compiler      *
+*     ****************************      *
+*                                       *
+*     Implementation for Lilith         *
+*                                       *
+*                                       *
+*     MCP2Reference:                    *
+*                                       * 
+*     Generation of reference file      *
+*                                       * 
+*     Version C19 of 23.07.82           *
+*                                       *
+*     Institut fuer Informatik          *
+*     ETH-Zuerich                       *
+*     CH-8092 Zuerich                   *
+*                                       *
+****************************************)
+
+IMPLEMENTATION MODULE MCP2Reference; (* LG *)
+
+  FROM CompFile IMPORT Reset, WriteWord;
+  FROM MCP2IO  IMPORT line, AsciiSetPos, AsciiRead, maxspix;
+  FROM MCBase IMPORT
+    Idptr, Stptr, Idclass, Structform, Varkind, Kindvar, Spellix,
+    bitsetptr, addrptr, processptr, mainmodp;
+  FROM MCPublic IMPORT refFile;
+
+  CONST
+    refversion = 40B;
+    maxfix = 16;
+
+  TYPE
+    RefSymbol = (reffileRS, endRS,
+                 moduleRS, procRS, typeRS, varRS,
+                 typerefRS, undefRS,
+                 integerRS, cardinalRS, charRS, booleanRS,
+                 realRS, bitsetRS, proctypRS,
+                 wordRS, addressRS, processRS,
+                 subrRS, enumRS, setRS, pointerRS,
+                 arrayRS, arrdynRS, recordRS,
+                 hiddenRS, openRS,
+                 constRS, fieldRS,
+                 absRS, indRS, relRS);
+    Byte = [0 .. 377B];
+    ForwardIndex = [0 .. maxfix];
+
+  VAR
+    writeref: BOOLEAN; (* writing on ref file allowed *)
+    wordbuff : CARDINAL;
+    highbyte : BOOLEAN;
+    fref : ARRAY [0 .. maxfix-1] OF Stptr;
+
+  PROCEDURE WriteRef(b: Byte);
+  BEGIN (* WriteRef *)
+    (* format to 0..377B *)
+    b := b MOD 400B;
+    IF highbyte THEN
+      INC(wordbuff,b*400B);
+      WriteWord(refFile,wordbuff);
+    ELSE
+      wordbuff := b;
+    END;
+    highbyte := NOT highbyte;
+  END WriteRef;
+
+  PROCEDURE RefSym(sym: RefSymbol);
+    (* write a reference symbol on the ref file *)
+  BEGIN (* RefSym *)
+    WriteRef(ORD(sym));
+  END RefSym;
+
+  PROCEDURE RefIdent(spix: Spellix);
+    (* write an identifier on the ref file *)
+    VAR ch: CHAR;
+  BEGIN (* RefIdent *)
+    IF spix > maxspix THEN WriteRef(ORD("*"));
+    ELSE
+      AsciiSetPos(spix);
+      AsciiRead(ch);
+      WHILE ch <> ' ' DO 
+        WriteRef(ORD(ch));
+        AsciiRead(ch);
+      END;
+    END; (* IF *)
+    WriteRef(0);
+  END RefIdent;
+  
+  PROCEDURE RefNum(num: CARDINAL);
+    (* write a number on the ref file *)
+  BEGIN (* RefNum *)
+    WriteRef(num DIV 400B);
+    WriteRef(num MOD 400B);
+  END RefNum;
+
+  PROCEDURE TypeRef(VAR sp: Stptr);
+    (* write a type reference on the ref file *)
+    VAR sym : RefSymbol;
+  BEGIN (* TypeRef *)
+    IF sp = NIL THEN sym := undefRS;
+    ELSE
+      WITH sp^ DO
+        CASE form OF
+          ints : sym := integerRS;
+        | cards : sym := cardinalRS;
+        | chars : sym := charRS;
+        | bools : sym := booleanRS;
+        | reals : sym := realRS;
+        | proctypes : sym := proctypRS;
+        | words : sym := wordRS;
+        ELSE
+          IF sp = bitsetptr THEN sym := bitsetRS;
+          ELSIF sp = addrptr THEN sym := addressRS;
+          ELSIF sp = processptr THEN sym := processRS;
+          ELSE sym := typerefRS;
+          END;
+        END; (* CASE *)
+      END; (* WITH *)
+    END;
+    RefSym(sym);
+    IF sym = typerefRS THEN RefNum(CARDINAL(sp)) END;
+  END TypeRef;
+
+  PROCEDURE Type(VAR sp: Stptr);
+    (* write a type description on the ref file *)
+
+    VAR ip : Idptr;
+        writetype : BOOLEAN;
+        sym : RefSymbol;
+
+    PROCEDURE ForwardRef;
+      VAR fix : ForwardIndex;
+          (* sp, writetype from Type *)
+    BEGIN (* ForwardRef *)
+      fix := 0;
+      WHILE (fix < maxfix) AND (fref[fix] <> NIL) DO INC(fix) END;
+      IF fix < maxfix THEN
+        fref[fix] := sp;
+        writetype := FALSE;
+      END;
+    END ForwardRef;
+
+  BEGIN (* Type *)
+
+    IF (sp = NIL) OR sp^.inlist THEN RETURN END;
+
+    writetype := TRUE;
+    WITH sp^ DO
+      inlist := TRUE;
+      CASE form OF
+        subranges : sym := subrRS; Type(scalp);
+      | enums : sym := enumRS;
+      | sets : sym := setRS; Type(basep);
+      | pointers :
+          sym := pointerRS;
+          IF elemp = NIL THEN ForwardRef;
+          ELSE Type(elemp);
+          END;
+      | arrays :
+          IF dyn THEN sym := arrdynRS;
+          ELSE sym := arrayRS; Type(ixp);
+          END;
+          Type(elp);
+      | records :
+          sym := recordRS;
+          ip := fieldp;
+          WHILE ip <> NIL DO
+            Type(ip^.idtyp);
+            ip := ip^.link;
+          END;
+      | hides :
+          sym := hiddenRS;
+          IF (stidp <> NIL) AND (stidp^.globmodp = mainmodp) THEN ForwardRef END;
+      | opens : sym := openRS; Type(openstruc);
+      ELSE writetype := FALSE;
+      END; (* CASE *)
+
+      IF NOT writetype THEN RETURN END;
+
+      RefSym(typeRS);
+      RefNum(CARDINAL(sp));
+      IF stidp = NIL THEN WriteRef(0) ELSE RefIdent(stidp^.name) END;
+      RefSym(sym);
+      RefNum(size);
+      CASE sym OF
+        subrRS :
+          RefNum(min);
+          RefNum(max);
+          TypeRef(scalp);
+      | enumRS :
+          ip := fcstp;
+          WHILE ip <> NIL DO
+            WITH ip^ DO
+              RefSym(constRS);
+              RefNum(cvalue.value);
+              RefIdent(name);
+              ip := link;
+            END; (* WITH *)
+          END; (* WHILE *)
+          RefSym(endRS);
+      | setRS : TypeRef(basep);
+      | pointerRS : TypeRef(elemp);
+      | arrayRS : TypeRef(ixp); TypeRef(elp);
+      | arrdynRS : TypeRef(elp);
+      | recordRS :
+          ip := fieldp;
+          WHILE ip <> NIL DO
+            WITH ip^ DO
+              RefSym(fieldRS);
+              RefNum(fldaddr);
+              RefIdent(name);
+              TypeRef(idtyp);
+              ip := link;
+            END; (* WITH *)
+          END; (* WHILE *)
+          RefSym(endRS);
+      | hiddenRS : (* nothing more *)
+      | openRS : TypeRef(openstruc);
+      END; (* CASE *)
+    END; (* WITH *)
+  END Type;
+
+  PROCEDURE Reference(ip : Idptr);
+    (* write a reference to the identifier *)
+    VAR tp : Stptr; 
+        sym : RefSymbol;
+  BEGIN
+    IF writeref AND (ip<>NIL) THEN
+      WITH ip^ DO
+        CASE klass OF
+          mods, pures, funcs :
+            IF klass = mods THEN RefSym (moduleRS);
+            ELSE RefSym (procRS);
+            END;
+            RefNum (line);
+            RefNum (procnum);
+            RefIdent (name);
+        | types :
+            Type(idtyp);
+        | vars :
+            Type(idtyp);
+            RefSym (varRS);
+            RefNum (line);
+            IF state = absolute THEN RefSym(absRS);
+            ELSIF indaccess THEN RefSym(indRS);
+            ELSE RefSym(relRS);
+            END;
+            RefNum(vaddr);
+            RefIdent (name);
+            TypeRef(idtyp);
+         ELSE
+         END (* CASE *)
+       END (* WITH *)
+     END;
+  END Reference;
+
+  PROCEDURE EndReference(ip:Idptr);
+    VAR fix : ForwardIndex;
+        sp : Stptr;
+  BEGIN (* EndReference *)
+    IF writeref AND (ip<>NIL) THEN
+      (* write forward references *)
+      fix := 0;
+      WHILE fix < maxfix DO
+        IF fref[fix] <> NIL THEN
+          sp := fref[fix];
+          IF (sp^.form = pointers) AND (sp^.elemp <> NIL) OR
+             (sp^.form = opens) THEN (* write information *)
+            fref[fix] := NIL;
+            sp^.inlist := FALSE;
+            Type(sp);
+          END;
+        END;
+        INC(fix);
+      END; (* WHILE *)
+      RefSym(endRS);
+    END;
+  END EndReference;
+
+  PROCEDURE InitRef;
+    (* initialisation of ref file *)
+    VAR fix : ForwardIndex;
+  BEGIN (* InitRef *)
+    writeref := TRUE;
+    Reset(refFile);
+    highbyte := FALSE;
+    RefSym(reffileRS);
+    RefNum(refversion);
+    fix := 0;
+    WHILE fix < maxfix DO fref[fix] := NIL; INC(fix) END;
+  END InitRef;
+
+  PROCEDURE TermRef;
+  BEGIN (* TermRef *)
+    IF highbyte THEN WriteRef(0) END;
+    Reset(refFile);
+    writeref := FALSE;
+  END TermRef;
+
+BEGIN (* MCP2Reference *)
+  writeref := FALSE
+END MCP2Reference. 

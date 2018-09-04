@@ -1,0 +1,52 @@
+DEFINITION MODULE UserProfile; (* Werner Winiger 5.2.82 
+                  ===========
+
+  Syntax of DK.User.Profile:
+    UserProfile = Group { Group }.
+    Group = '"' GroupId '"' { Item }.
+    Item = "'" ItemId "'" Value "EOL".  *)
+
+  EXPORT QUALIFIED
+    LookupUserProfile, CloseUserProfile, SetReadPos, SetWritePos, 
+    ReadItem, WriteGroupId, WriteItemId, WriteItem;
+
+
+  PROCEDURE LookupUserProfile (new: BOOLEAN; VAR done: BOOLEAN); (*
+    FileSystem.Lookup(userProfile,"DK.User.Profile",new); 
+    done := userProfile.res = done;                              *)
+
+  PROCEDURE CloseUserProfile; (*
+    completes writing of the user profile and closes it  *)
+
+  PROCEDURE SetReadPos (groupId, itemId: ARRAY OF CHAR; VAR done: BOOLEAN); (*
+    searches the specified group through all the user profile;
+    returns FALSE if there is no such group at all;
+    otherwise subsequent calls of ReadItem will give the items of this group;
+    if the item id isn't empty, the specified item is searched within the group;
+    returns FALSE if there is no such item;
+    otherwise a subsequent call of ReadItem will give the value of this item *)
+
+  PROCEDURE SetWritePos (groupId, itemId: ARRAY OF CHAR; VAR done: BOOLEAN); (*
+    if both id's are empty, then the user profile is positioned at the end (for
+    appending new data);
+    if the group id isn't empty, then the user profile is positioned at the end 
+    of this group (for appending new items to this group);
+    if both id's aren't empty, then if there is already such an item in this group,
+    then the user profile is positioned after the item id (for overwriting the value)
+    else the user profile is positioned at the end of this group and the item id is
+    appended to the group (for subsequent appending of the value); *)
+
+  PROCEDURE ReadItem (VAR itemId, value: ARRAY OF CHAR; VAR eog: BOOLEAN); (*
+    reads the next item from the current group or returns eog=TRUE, if there
+    is no further item in the group; *)
+
+  PROCEDURE WriteGroupId (groupId: ARRAY OF CHAR); (*
+     *)
+
+  PROCEDURE WriteItemId (itemId: ARRAY OF CHAR); (*
+     *)
+
+  PROCEDURE WriteItem (value: ARRAY OF CHAR); (*
+     *)
+
+END UserProfile.

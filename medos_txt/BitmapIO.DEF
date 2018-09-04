@@ -1,0 +1,19 @@
+DEFINITION MODULE BitmapIO; (* Werner Winiger 7.1.81 *)
+
+  FROM Screen     IMPORT Bitmap;
+  FROM FileSystem IMPORT File;
+
+
+  EXPORT QUALIFIED ReadBitmap, WriteBitmap;
+
+
+PROCEDURE ReadBitmap (VAR f: File; VAR bm: Bitmap);
+  (*
+  reads binary data from file f into the bitmap bm. *) 
+
+
+PROCEDURE WriteBitmap (VAR f: File; VAR bm: Bitmap);
+  (*
+  writes the bitmap bm onto the file f.             *)
+
+END BitmapIO.

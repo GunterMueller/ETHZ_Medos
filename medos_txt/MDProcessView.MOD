@@ -1,0 +1,189 @@
+IMPLEMENTATION MODULE MDProcessView;  (* Ch. Jacobi, modified P. Karrer *)
+  FROM SYSTEM IMPORT ADDRESS;
+  FROM Monitor IMPORT CurrentLevel;
+  FROM WindowHandler IMPORT
+    Window, OpenWindow, Clear, GetPos, FreeLines, PutOnTop, CloseWindow,
+    CreateWindow, WindowSignal, SignalSet, FullScreen;
+  FROM CursorStuff IMPORT MenuSelection;
+  FROM WindowDialogue IMPORT 
+    InstallWindow, RemoveWindow;
+  FROM OutWindow IMPORT WriteS, WriteO, WriteLn;
+  IMPORT OutTerminal; 
+
+  FROM DumpFileHandler IMPORT Mem;
+  FROM Inspect IMPORT Installate, CalledAddr, Show;
+  FROM MDProcView IMPORT DebugProcess, DisplayErrorCause;
+  FROM MDWhatToDebug IMPORT debuglife;
+
+  CONST
+      EOL = 36C; 
+
+  VAR
+    currentVisibleProcess: CARDINAL; (*in processwindow; don't care about chain*)
+    procdescwin, disp: Window;
+    winx, winy, winw, winh: CARDINAL;
+    processViewLevel: CARDINAL;
+
+
+  PROCEDURE ProcessViewRestore(w: Window; s: WindowSignal);
+  BEGIN
+    IF s IN SignalSet{redraw, moved, changed, fontchanged} THEN
+      ShowProcess(currentVisibleProcess)
+    ELSIF s = closed THEN
+      processViewLevel := 177777B;
+      winx := w^.outerblk.x;
+      winy := w^.outerblk.y;
+      winw := w^.outerblk.w;
+      winh := w^.outerblk.h;
+    END
+  END ProcessViewRestore;
+
+
+  PROCEDURE ProcessViewHandler(w: Window; reason: CARDINAL);
+    VAR a: ADDRESS;
+  BEGIN 
+    IF reason=5 THEN
+      CloseWindow(procdescwin)
+    ELSE
+      CASE MenuSelection("PROCESS| debug| normal| caller| memory| stack| remove") OF
+        2: DebugProcess(currentVisibleProcess, FALSE)|
+        3: ShowProcess(Mem(5))|
+        4: a := 42B;     (*let a to point to the frame entry of "Program"*)
+           a := Mem(a);  (*let a be the frame startaddress of "Program"*)
+           a := a+11;    (* a is address of a PROCESS *)
+           ShowProcess(Mem(a))| 
+        5: Show(currentVisibleProcess)|
+        6: ShowExpressionStack()|
+        7: RemoveWindow(procdescwin); CloseWindow(procdescwin)
+      ELSE PutOnTop(w)
+      END
+    END
+  END ProcessViewHandler;
+
+
+  PROCEDURE DebugProcessVar;
+  BEGIN
+    ShowProcess(Mem(CalledAddr()));
+  END DebugProcessVar;
+
+
+  PROCEDURE ShowExpressionStack();
+    VAR s, n: CARDINAL; done: BOOLEAN;
+  BEGIN 
+    IF currentVisibleProcess<=(177777B - 30B) THEN 
+      s := Mem(currentVisibleProcess+4);
+      IF s>1 THEN
+        n := Mem(s-1);
+        IF (n<=16) AND (n+1<=s) THEN
+          OutTerminal.WriteT("expression stack: ", 0);
+          OutTerminal.WriteC(n, 0);  
+          OutTerminal.WriteT(" value(s)", 0);
+          OutTerminal.WriteLn;
+          IF n>0 THEN Show(s-1-n) END;
+          RETURN
+        END 
+      END
+    END;
+    OutTerminal.WriteT("bad expression stack", 0); OutTerminal.WriteLn;
+  END ShowExpressionStack;
+
+
+  PROCEDURE ShowProcess(p: CARDINAL);
+    VAR
+      lG, lMask, lS, lH, lErrCode,
+      lTrap: CARDINAL;             (*process register*)
+      procPC, procDL: CARDINAL;
+  BEGIN
+    OpenProcessView;
+    IF processViewLevel = 177777B THEN RETURN END;
+    currentVisibleProcess := p;
+    Clear(procdescwin);
+    WriteS(procdescwin, ' P'); WriteO(procdescwin, p, 7); 
+    IF p<=(177777B - 30B) THEN 
+      lG := Mem(p);
+      procDL := Mem(p+1);
+      procPC := Mem(p+2);
+      lMask := Mem(p+3);
+      lS := Mem(p+4);
+      lH := Mem(p+5);
+      lErrCode := Mem(p+6);
+      lTrap := Mem(p+7);
+      IF (lH<=lS) OR (lS<=procDL) THEN
+        WriteS(procdescwin, ' ** BAD **')
+      END;
+      WriteLn(procdescwin);
+      DisplayErrorCause(lErrCode, procdescwin);
+      WriteLn(procdescwin);
+      WriteS(procdescwin, ' L'); WriteO(procdescwin, procDL, 7);
+      WriteS(procdescwin, '   PC   '); WriteO(procdescwin, procPC, 7);
+      WriteLn(procdescwin);
+      WriteS(procdescwin, ' G'); WriteO(procdescwin, lG, 7);
+      WriteS(procdescwin, '   error'); WriteO(procdescwin, lErrCode, 7);
+      WriteLn(procdescwin);
+      WriteS(procdescwin, ' S'); WriteO(procdescwin, lS, 7);
+      WriteS(procdescwin, '   mask '); WriteO(procdescwin, lMask, 7);
+      WriteLn(procdescwin);
+      WriteS(procdescwin, ' H'); WriteO(procdescwin, lH, 7);
+      WriteS(procdescwin, '   Tmask'); WriteO(procdescwin, lTrap, 7);
+    ELSE
+      WriteLn(procdescwin);
+      WriteS(procdescwin, 'bad process pointer');
+      WriteLn(procdescwin);
+    END;
+  END ShowProcess;
+ 
+
+  PROCEDURE OpenProcessView;
+    VAR done: BOOLEAN;
+  BEGIN
+    IF processViewLevel = 177777B THEN 
+      CreateWindow(procdescwin, winx, winy, winw, winh,
+        "   process",
+        FALSE, ProcessViewRestore, done);
+      IF done THEN 
+        Clear(procdescwin);
+        InstallWindow(procdescwin,
+          {1..5}, ProcessViewHandler,
+          SignalSet{moved, changed, fontchanged},
+          done);
+        IF NOT done THEN CloseWindow(procdescwin)
+        ELSE processViewLevel := CurrentLevel()
+        END
+      END;
+    END
+  END OpenProcessView;
+
+
+  PROCEDURE InitProcessView;
+    CONST AddrSavePRegister = 5;
+    VAR dirtyStart[40B+2]: POINTER TO 
+          RECORD
+            skip: ARRAY [0..10] OF CARDINAL;
+            x: CARDINAL;
+          END;
+  BEGIN
+    IF debuglife THEN ShowProcess(dirtyStart^.x);
+    ELSE ShowProcess(Mem(AddrSavePRegister));
+    END;
+  END InitProcessView;
+
+
+  PROCEDURE TerminateProcessView;
+  BEGIN
+    IF processViewLevel >= CurrentLevel() THEN
+      processViewLevel := 177777B
+    END
+  END TerminateProcessView;
+
+
+BEGIN (*ProcessView *)
+  disp := FullScreen();
+  WITH disp^.outerblk DO
+    winx := 551; winy := 304; winw := 212; winh := 117;
+    IF w<768 THEN winx := 441; winy := 529; winw := 194; winh := 115 END;
+    IF winh>h THEN winh := h DIV 2 END;
+  END;
+  processViewLevel := 177777B; 
+  Installate(" proces", DebugProcessVar);
+  InitProcessView;
+END MDProcessView.

@@ -1,0 +1,33 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*          Frames:                     *
+*          Allocator for fixed frames  *
+*                                      *
+*          04.06.82                    *    
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE Frames;
+
+  EXPORT QUALIFIED
+    FramePointer, nil,
+    Allocate, Deallocate, ChangeSize, Size;
+
+  TYPE FramePointer = CARDINAL;
+
+  CONST nil = 177777B;
+
+  PROCEDURE Allocate(VAR fp: FramePointer; size: CARDINAL);
+  PROCEDURE Deallocate(VAR fp: FramePointer);
+  PROCEDURE ChangeSize(fp: FramePointer; newsize: CARDINAL; VAR done: BOOLEAN);
+  PROCEDURE Size(fp: FramePointer): CARDINAL;
+
+END Frames.

@@ -1,0 +1,53 @@
+(***************************************************************
+*           Long-File-Handling / Part of                       *
+*           MIA / Version 20 /  9.4.82 / W. Winiger            *
+***************************************************************)
+
+DEFINITION MODULE LongFiles;
+
+EXPORT QUALIFIED FileName, LongFileName, maxNumberOfFiles, OpenNextInputFile,
+                 ReadInputChar, StopInput,
+                 CreateFirstListing, WriteFirstListing, CatalogFirstListing,
+                 ResetFirstListing, ReadFirstListing,
+                 CreateSecondListing, WriteSecondListing, CloseListings;
+
+CONST maxNumberOfFiles = 5;
+
+TYPE FileName = ARRAY[0..31] OF CHAR;
+     LongFileName = ARRAY [1..maxNumberOfFiles] OF FileName;
+
+PROCEDURE OpenNextInputFile(VAR f: FileName; VAR found: BOOLEAN);
+(*  *)
+
+PROCEDURE ReadInputChar(VAR ch: CHAR; VAR eof: BOOLEAN);
+(*  *)
+
+PROCEDURE StopInput;
+(*  *)
+
+PROCEDURE CreateFirstListing;
+(*  *)
+
+PROCEDURE WriteFirstListing (ch: CHAR);
+(*  *)
+
+PROCEDURE CatalogFirstListing (VAR names: LongFileName);
+(*  *)
+
+PROCEDURE ResetFirstListing;
+(*  *)
+
+PROCEDURE ReadFirstListing (VAR ch: CHAR; VAR eof: BOOLEAN);
+(*  *)
+
+PROCEDURE CreateSecondListing (VAR names: LongFileName);
+(*  *)
+
+PROCEDURE WriteSecondListing (ch: CHAR);
+(*  *)
+
+PROCEDURE CloseListings;
+(*  *)
+
+
+END LongFiles.

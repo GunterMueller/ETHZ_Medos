@@ -1,0 +1,12 @@
+modula
+MemoryFiles.DEF
+modula
+CompFile.DEF
+modula
+WriteStrings.DEF
+modula
+MemoryFiles.MOD
+modula
+CompFile.MOD
+modula
+WriteStrings.MOD

@@ -1,0 +1,379 @@
+MODULE showSCF; (* Werner Winiger 6.12.82 *)
+
+  FROM Terminal IMPORT Read, BusyRead, ReadAgain, WriteString;
+  IMPORT Terminal;
+  FROM CursorStuff IMPORT TrackCursor, MenuSelection;
+  FROM Screen IMPORT GetDefaultFont, GetDefaultBitmap;
+  FROM WindowHandler IMPORT 
+    Window, BlockDescriptor, Font, Bitmap, 
+    DefaultWindow, OpenWindow, CloseWindow,
+    UseForDefault, SetFont, LoadFont, Clear, FreeLines, DisplayChar;
+  FROM OutWindow IMPORT Write, WriteS, WriteLn;
+  FROM FileNames IMPORT ReadFileName;
+  FROM FileSystem IMPORT  
+    File, Response, Lookup, Close, ReadChar, Again;
+  FROM Options IMPORT FileNameAndOptions, GetOption, Termination;
+  FROM BitmapIO IMPORT WriteBitmap;
+
+  CONST
+    NULL  = 0c;
+    FF    = 14c;
+    CtrlP = 20c;
+    ESC   = 33c;
+    EOL   = 36c;
+
+  VAR
+    w,t,system: Window;
+    b: CARDINAL;
+    mH, mW, dW, screenH, xW,
+    mHact, Hstep, Htop,
+    m1, m2, m3, m4: CARDINAL;
+    name: ARRAY [0..31] OF CHAR;
+    ok, hit: BOOLEAN;
+    dummy: CHAR;
+    default: Font;
+    pict: ARRAY [0..32] OF CHAR;
+
+  PROCEDURE hardCopy;
+    VAR
+      f        : File;
+      defBitmap: Bitmap;
+  BEGIN
+    Lookup(f,pict,TRUE);
+    IF f.res = done THEN
+      GetDefaultBitmap(defBitmap);
+      WriteBitmap(f,defBitmap);
+      pict[10] := CHAR(CARDINAL(pict[10])+1);
+    END;
+    Close(f);
+  END hardCopy;
+
+  PROCEDURE Construct (VAR n: ARRAY OF CHAR; m1,m2,m3,m4: CARDINAL);
+    VAR
+      i: CARDINAL;
+
+    PROCEDURE AppendCh (s: CHAR);
+    BEGIN
+      n[i] := s;
+      INC(i);
+    END AppendCh;
+
+    PROCEDURE Append (s: ARRAY OF CHAR);
+      VAR
+        j: CARDINAL;
+    BEGIN
+      j := 0;
+      REPEAT
+        AppendCh(s[j]);
+        INC(j);
+      UNTIL j > HIGH(s);
+    END Append;
+
+  BEGIN
+    i := 0;
+    IF m1 = 9 THEN
+      CASE m4 OF 
+      0,1: n[0] := 0c; RETURN; |
+      2: Append('SYMBOL32'); |
+      3: n[0] := 1c; |
+      4: Append('ARROWS12'); |
+      5: WriteLn(system); WriteS(system,'which one ? > ');
+         ReadFileName(n,'DK.GACHA14.SCF'); Read(dummy);
+         LOOP
+           n[i] := n[i+3];
+           INC(i);
+           IF n[i+3] = '.' THEN EXIT; END;
+         END;
+         n[i] := 0c;
+         RETURN;
+      END;
+    ELSE
+      CASE m1 OF
+      0,1: n[0] := 0c; RETURN; |
+      2: Append('GACHA'); |
+      3: Append('HELVETICA'); |
+      4: Append('TIMESROMAN'); |
+      5: Append('MATH'); |
+      6: Append('HIPPO'); |
+      7: Append('OLDENGLISH'); |
+      8: Append('CREAM'); 
+      END;
+      CASE m2 OF
+      0,1: n[0] := 0c; RETURN; |
+      2: AppendCh('8'); |
+      3: Append('10'); |
+      4: Append('12'); |
+      5: Append('14'); |
+      6: Append('16'); |
+      7: Append('18'); |
+      8: Append('20');
+      END;
+      CASE m3 OF
+      0,1: n[0] := 0c; RETURN; |
+      2: |
+      3: AppendCh('I'); |
+      4: AppendCh('B'); |
+      5: AppendCh('E');
+      END;
+    END;
+    n[i] := 0c;
+  END Construct;
+
+  PROCEDURE TabulateFont;
+    VAR
+      pos: BlockDescriptor;
+      i,j: CARDINAL;
+
+    PROCEDURE Setpos (x0,y0: CARDINAL);
+    BEGIN
+      WITH pos DO
+        x := x0-25;
+        y := y0;
+        w := mW - x0;
+        h := 16;
+      END;
+    END Setpos;
+
+    PROCEDURE WriteHex (digit: CARDINAL);
+    BEGIN
+      IF digit < 10
+      THEN DisplayChar(t,pos,system^.font,CHAR(30h+digit));
+      ELSE DisplayChar(t,pos,system^.font,CHAR(41h-10+digit));
+      END;
+    END WriteHex;
+
+  BEGIN
+    Clear(t);
+
+    FOR i := 0 TO 15 DO
+      Setpos(dW+32 + i*32, mHact-Htop);
+      WriteHex(i);
+    END;
+    FOR j := 0 TO 15 DO
+      Setpos(dW,mHact-Htop-Hstep - j*Hstep);
+      WriteHex(j);
+      Setpos(dW+17*32,mHact-Htop-Hstep - j*Hstep);
+      WriteHex(j);
+    END;
+
+    FOR j := 0 TO 15 DO
+      FOR i := 0 TO 15 DO
+        Setpos(dW+32 + j*32, mHact-Htop-Hstep - i*Hstep);
+        DisplayChar(t,pos,t^.font,CHAR(i + 16*j));
+      END;
+    END;
+  END TabulateFont;
+
+  PROCEDURE List;
+    VAR
+      ch: CHAR;
+      f: File;
+      opt,fontName,fN: ARRAY[0..31] OF CHAR;
+      term: Termination;
+      l, length: CARDINAL;
+      pageWise, ok: BOOLEAN;
+  BEGIN
+    WriteLn(system); WriteS(system,'enter the filename > ');
+
+    FileNameAndOptions('DK..LST',fN,term,TRUE);
+    IF term <> normal THEN
+      WriteS(system,' no file');
+      RETURN;
+    END;
+
+    Lookup(f,fN,FALSE);
+    IF f.res <> done THEN
+      WriteS(system,' not found');
+      RETURN;
+    END;
+
+    pageWise := FALSE;
+
+    LOOP
+      GetOption(opt,length);
+      IF length = 0 THEN EXIT; END;
+
+      IF opt[0] = 'P' THEN  
+        pageWise := TRUE;
+      ELSE 
+        WriteS(system,' illegal option: ');
+        WriteS(system,opt);
+        Close(f);
+        RETURN;
+      END;
+    END;
+
+    WriteLn(t);
+    IF pageWise THEN
+      IF FreeLines(t) < 2 THEN Write(t,FF); END;
+
+      LOOP
+        FOR l := 1 TO FreeLines(t) DO
+          REPEAT
+            ReadChar(f,ch);
+            IF f.eof THEN EXIT; END;
+            Write(t,ch);
+          UNTIL ch = EOL;
+        END;
+
+        WriteS(t,'...');
+        Read(ch);
+        IF ch = ESC THEN 
+          WriteLn(t);
+          EXIT; 
+        END;
+        Write(t,FF);
+      END;
+    ELSE
+      LOOP
+        REPEAT
+          ReadChar(f,ch);
+          IF f.eof THEN EXIT; END;
+          Write(t,ch);
+        UNTIL ch = EOL;
+        BusyRead(ch);
+        IF ch <> NULL THEN
+          IF ch = ESC THEN 
+            WriteLn(t);
+            EXIT; 
+          END;
+          Read(ch);
+          IF ch = ESC THEN 
+            WriteLn(t);
+            EXIT; 
+          END;
+        END;
+      END;
+    END;
+
+    Close(f);
+  END List;
+
+  PROCEDURE Type;
+    VAR
+      ch: CHAR;
+      b: CARDINAL;
+  BEGIN
+    WriteLn(system); WriteS(system,'type ESC to exit');
+    ch := '>';
+    REPEAT
+      Write(t,ch);
+      b := TrackCursor();
+      IF b = 0 THEN Read(ch);
+      ELSE ch := 33c;
+      END;
+    UNTIL ch = 33c;
+  END Type;
+
+  PROCEDURE Show;
+  BEGIN
+    WriteLn(t);
+    WriteS(t,'ABCDEFGHIJKLMNOPQRSTUVWXYZ'); WriteLn(t);
+    WriteS(t,'abcdefghijklmnopqrstuvwxyz'); WriteLn(t);
+    WriteS(t,'0123456789 !"#$%&()[]{}<>=-+*^~\|_:;.,/?@`'); WriteLn(t);
+  END Show;
+
+  PROCEDURE ShowName;
+  BEGIN
+    WriteLn(system);
+    WriteS(system,"the current font's name is: ");
+    WriteS(system,name);
+  END ShowName;
+
+BEGIN
+  pict := 'DK.showSCF0.PICT';
+  w := DefaultWindow();
+  screenH := w^.innerblk.h;
+  IF w^.innerblk.w > 640 THEN
+    xW := 10;
+    mW := 740;
+    mH := 400;
+    dW := 96;
+  ELSE
+    xW := 0;
+    mW := 640;
+    mH := 600;
+    dW := 60;
+  END;
+  OpenWindow(system,xW,10,mW,screenH-mH-30,'SYSTEM',ok);
+  UseForDefault(system);
+  OpenWindow(t,xW,screenH-mH-10,mW,mH,'TEXT',ok);
+  mHact := t^.innerblk.h;
+  Hstep := (mHact-16) DIV 16;
+  Htop := mHact - (16*Hstep);
+
+  WriteLn(system); WriteS(system,'push B2 to get the menu');
+  LOOP
+    b := TrackCursor();
+    CASE b OF
+    2:
+      m1 := MenuSelection('FAMILY|Gacha|Helvetica|Timesroman|Math|Hippo|Oldenglish|Cream|Others|EXIT');
+      CASE m1 OF
+      0  : Read(dummy);
+           hit := FALSE; | 
+      1  : hit := FALSE; | 
+      9  : m4 := MenuSelection('*OTHERS|Symbol32|Default|Arrows12|Others');
+           hit := m4 > 1; |
+      10 : EXIT;
+      ELSE m2 := MenuSelection('*SIZE|8|10|12|14|16|18|20');
+           IF m2 > 1 THEN
+             m3 := MenuSelection('*STYLE|normal|italic|bold|extended');
+             IF m3 = 0 THEN Read(dummy); END;
+             hit := m3 > 1;
+           ELSE
+             IF m2 = 0 THEN Read(dummy); END;
+             hit := FALSE;
+           END;
+      END; |
+    0:
+      hit := FALSE;
+      Read(dummy);
+      IF dummy = CtrlP THEN hardCopy; END;
+    ELSE
+    END;
+    IF hit THEN
+      Construct(name,m1,m2,m3,m4);
+      WriteLn(system); WriteS(system, name);
+      IF name[0] = 1c THEN
+        GetDefaultFont(default);
+        SetFont(t, default);
+        ok := TRUE;
+      ELSE
+        LoadFont(t,name,ok);
+      END;
+      IF NOT ok THEN 
+        WriteS(system,' not found'); 
+      ELSE
+        LOOP
+          WriteLn(system); WriteS(system,'push B2 to get the menu');
+          b := TrackCursor();
+          CASE b OF
+          2:
+            m1 := MenuSelection('CHOICES|list file|key in|show abc|table|fontname|clear|EXIT');
+            CASE m1 OF
+            0: Read(dummy); |
+            1: | 
+            2: List; |
+            3: Type; |
+            4: Show; |
+            5: TabulateFont; |
+            6: ShowName; |
+            7: Clear(t); |
+            8: EXIT;
+            END; |
+          0:
+            Read(dummy);
+            IF dummy = CtrlP THEN hardCopy; END;
+          ELSE
+          END;
+        END;
+      END;
+    ELSE
+      WriteLn(system); WriteString('try again');
+    END;
+  END; (* loop *)
+
+  CloseWindow(system);
+  CloseWindow(t);
+  Terminal.Write(FF);
+END showSCF.

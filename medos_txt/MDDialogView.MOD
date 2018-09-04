@@ -1,0 +1,99 @@
+IMPLEMENTATION MODULE MDDialogView;  (* Ch. Jacobi,  10.6.81*)
+  FROM Monitor IMPORT Terminate,Status;
+  FROM Terminal IMPORT 
+    WriteString, WriteLn, BusyRead, Read;
+  FROM WindowHandler IMPORT 
+    Window, OpenWindow, UseForDefault, FullScreen,
+    SignalSet, WindowSignal, CloseWindow;
+  FROM CursorStuff IMPORT MenuSelection;
+  FROM WindowDialogue IMPORT 
+    InstallWindow, EndLoop, RemoveWindow;
+
+  CONST maxcommands = 9;
+        maxmenulen = 100;
+        dateandversion = "debug 4.4; 19.Oct.82"; 
+
+  VAR Command: ARRAY [0..maxcommands] OF PROC;
+      menu: ARRAY [0..maxmenulen] OF CHAR;
+      menulength, commandcount: CARDINAL;
+      done: BOOLEAN;
+      systemwindow, disp: Window;
+      winx, winy, winw, winh: CARDINAL;
+
+
+  PROCEDURE InstallDialogCommand(p: PROC; text: ARRAY OF CHAR);
+    VAR i, high: CARDINAL;
+  BEGIN
+    IF (commandcount < maxcommands) AND (menulength < maxmenulen) THEN
+      menu[menulength] := "|";
+      i := 0; INC(menulength); high := HIGH(text);
+      LOOP
+        IF (i <= high) AND (menulength < maxmenulen) THEN
+          menu[menulength] := text[i];
+          IF text[i] = 0C THEN EXIT END;
+          INC(i); INC(menulength)
+        ELSE
+          menu[menulength] := 0C; EXIT
+        END
+      END;
+      INC(commandcount);
+      Command[commandcount] := p;
+    END
+  END InstallDialogCommand;
+
+
+  PROCEDURE CheckExit;
+    VAR ch: CHAR;
+  BEGIN
+    REPEAT BusyRead(ch) UNTIL ch = 0C;
+    WriteString('do you want to exit ? (y/-): ');
+    Read(ch); 
+    IF (ch='y') OR (ch="Y") THEN 
+      WriteString('yes'); WriteLn;
+      EndLoop;
+    ELSE 
+      WriteString('no'); WriteLn;
+      WriteString('so go on !'); WriteLn;
+    END
+  END CheckExit;
+
+
+  PROCEDURE NoAction;
+  BEGIN
+  END NoAction;
+
+
+  PROCEDURE DialogHandler(w: Window; d: CARDINAL);
+  BEGIN
+    IF d IN {1..3} THEN 
+      Command[MenuSelection(menu)];
+    END
+  END DialogHandler;
+
+
+BEGIN
+  disp := FullScreen();
+  WITH disp^.outerblk DO
+    winx := 440; winy := 4; winw := 323; winh := 147;
+    IF w<768 THEN winx := 5; winy := 5; winw := 302 END;
+    IF h<winh THEN winh := h DIV 2 END;
+  END;
+  OpenWindow(systemwindow, winx, winy, winw, winh, "   dialog", done);
+  IF done THEN
+    UseForDefault(systemwindow);
+    InstallWindow(systemwindow,
+      {1..4}, DialogHandler,
+      SignalSet{moved, changed, fontchanged},
+      done)
+  END;
+  IF NOT done THEN 
+    WriteString("dialogwindow not opened"); WriteLn; 
+    Terminate(normal)
+  END;
+  WriteString(dateandversion); WriteLn; WriteLn;
+  FOR commandcount := 0 TO maxcommands DO Command[commandcount] := NoAction END;
+  menu := "COMMAND ";
+  commandcount := 1; menulength := 7;
+  InstallDialogCommand(CheckExit," exit")
+END MDDialogView.
+

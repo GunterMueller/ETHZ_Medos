@@ -1,0 +1,133 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          DiskSystem:                 *
+*                                      *
+*          Implementation of files     *
+*          on the Honeywell Bull 120   *
+*          disks drives.               *
+*          Privat for MEDOS and        *
+*          some utility programs.      *
+*                                      *
+*          Version 2  29.05.81         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE DiskSystem;
+ 
+  FROM FileSystem IMPORT
+    File, Response;
+ 
+  EXPORT QUALIFIED 
+    InitVolume, OpenVolume, CloseVolume,
+    FileDesc, FDKind,
+    nofile, father, son, (** PDP 11 only **)
+    FileNumber, Position, Minute,
+    Page,
+    FreePages,
+    ReadFileDesc, WriteFileDesc,
+    Name, ExternalName, NameKind,
+    free, fname, (** PDP 11 only **)
+    ReadName, WriteName;  
+
+
+  CONST 
+    nofile = 0; father = 1; son = 2; (*** PDP 11 only ***)
+    maxfiller = 27;
+    modifyprot = 100000B; 
+    sons = 16;
+    pagetablength = 96;
+ 
+    free = 0; fname = 1; (*** PDP 11 only ***)
+    enlength = 24;
+   
+  TYPE 
+    FileNumber    = CARDINAL;
+    FDKind        = CARDINAL; (*** (nofile, father, son); ***)
+    Position      = RECORD 
+                      block: CARDINAL; (* Whole sectors *) 
+                      byte: CARDINAL; 
+                    END; 
+    Minute        = RECORD 
+                      day: CARDINAL; (* coded as Time from Monitor *)
+                      minute: CARDINAL; 
+                    END;   
+    Page          = CARDINAL; 
+    FileDesc      = RECORD 
+                      reserved: CARDINAL;  
+                      filno: FileNumber; 
+                      versno: CARDINAL; (* versionnumber of this entry *) 
+                      CASE fdt: FDKind OF 
+                        nofile: 
+                          filler: ARRAY [0..maxfiller] OF CARDINAL | 
+                        father: 
+                          length: Position;   
+                          modification: CARDINAL; 
+                          referenced: CARDINAL;   (* ref'ed if <> 0 *) 
+                          protection: CARDINAL;   (* prot'ed if <> 0 *) 
+                          ctime: Minute;          (* creation time *) 
+                          mtime: Minute;          (* last modification *) 
+                          fres: ARRAY [0..3] OF CARDINAL; 
+                          sontab: ARRAY [1..sons-1] OF FileNumber; |
+                        son: 
+                          fatherfile: FileNumber; 
+                          fathervers: CARDINAL; 
+                          sonno: CARDINAL;
+                      END;   
+                      pagetab: ARRAY [0..pagetablength-1] OF Page;
+                    END; (* FileDesc *) 
+ 
+    NameKind      = CARDINAL; (*** (free, fname); ***)
+    ExternalName  = ARRAY [0..enlength-1] OF CHAR; 
+    Name          = RECORD 
+                      en: ExternalName; 
+                      CASE nk: NameKind OF
+                        free:  | 
+                        fname:
+                          fno: CARDINAL; (* file number *)
+                          vno: CARDINAL; (* version number *) 
+                          fres: CARDINAL;(* reserved (set to zero) *)
+                      END 
+                    END;
+ 
+           
+  PROCEDURE InitVolume(VAR r: Response); 
+    (* initializes a new volume *)
+
+  PROCEDURE OpenVolume(VAR r: Response); 
+    (* initializes DiskSystem for reading
+       or writing on the mounted volume. *)
+   
+  PROCEDURE CloseVolume(VAR r: Response);
+    (* makes the volume unaccessable. *)
+
+
+  PROCEDURE FreePages(): CARDINAL;
+    (* returns the number of free pages on the pack *)
+
+
+  PROCEDURE ReadFileDesc(no: FileNumber; VAR fd: FileDesc;
+                         VAR r: Response);
+    (* reads entry no in the filedirectory. *)  
+ 
+  PROCEDURE WriteFileDesc(no: FileNumber; VAR fd: FileDesc;
+                          VAR r: Response);
+    (* writes entry no into the filedirectory. *)
+ 
+
+  PROCEDURE ReadName(no: FileNumber; VAR n: Name; VAR r: Response); 
+    (* reads entry no in the namedirectory. *)
+   
+  PROCEDURE WriteName(no: FileNumber; n: Name; VAR r: Response); 
+    (* writes entry no into the namedirectory. *)
+
+END DiskSystem.

@@ -1,0 +1,16 @@
+DEFINITION MODULE MDFileControl;  (*Ch. Jacobi*)
+  FROM FileSystem IMPORT File;
+  EXPORT QUALIFIED
+    FileType,
+    query, refFile, lstFile, refOpen, lstOpen,
+    OpenFile;
+
+  TYPE FileType = (reffile, lstfile);
+
+  VAR query: BOOLEAN; 
+      refFile: File; refOpen: BOOLEAN;
+      lstFile: File; lstOpen: BOOLEAN;
+
+  PROCEDURE OpenFile(moduleNumber: CARDINAL; fileType: FileType; VAR new: BOOLEAN);
+
+END MDFileControl.

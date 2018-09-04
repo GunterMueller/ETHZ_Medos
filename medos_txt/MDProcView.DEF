@@ -1,0 +1,16 @@
+DEFINITION MODULE  MDProcView; (*C.B.; Ch.J.*)
+  FROM WindowHandler IMPORT Window;
+
+  EXPORT QUALIFIED
+   ShowProcedureChain, DisplayErrorCause,
+    DebugProcess;
+
+
+  PROCEDURE DebugProcess(p: CARDINAL; first: BOOLEAN);
+    (*to swtch to debug a process with p as processpointer*)
+
+  PROCEDURE ShowProcedureChain;
+
+  PROCEDURE DisplayErrorCause(cause: CARDINAL; w: Window);
+
+END MDProcView.

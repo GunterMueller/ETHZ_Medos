@@ -1,0 +1,145 @@
+IMPLEMENTATION MODULE graphDiagram;
+
+  (* Copyright: DISER AG *)
+  (* Author: Leo Geissmann, DISER Zurich *)
+  (* Version: 1 *)
+  (* Date: 83.09.02 *)
+  (* Purpose: Handling of data for graph diagrams *)
+
+  IMPORT
+    Storage,
+    WindowHandler,
+    graphPie,
+    graphLegend;
+
+  FROM Storage IMPORT
+    ALLOCATE, DEALLOCATE;
+
+  FROM WindowHandler IMPORT
+    Window, OpenWindow, CloseWindow, Clear,
+    LoadFont, SetDotPos, WriteChar;
+
+  FROM graphPie IMPORT
+    InitPie, PieSlice;
+
+  FROM graphLegend IMPORT
+    InitLegend, NextLegend;
+
+  CONST
+    maxlegend = 10; (* maximal length of legend *)
+
+  TYPE
+    DataPointer = POINTER TO Data;
+    Data = RECORD
+             nextdata : DataPointer; (* link to next data entry *)
+             value : REAL;           (* value of represented data *)
+             legend : ARRAY [0 .. maxlegend-1] OF CHAR; (* data legend *)
+             pattern : CARDINAL;     (* number of pattern in diagram *)
+             percent : REAL;         (* percentage of value on all data *)
+           END;
+
+  VAR
+    diagramwindow : Window; (* window for display of diagram *)
+    diagramok : BOOLEAN;    (* operations executed correctly *)
+    datahead : DataPointer; (* pointer to first data entry *)
+
+  PROCEDURE NewDiagram(
+              title : ARRAY OF CHAR; (* title of diagram *)
+              ok : BOOLEAN); (* initialization successful *)
+    VAR
+      ix : CARDINAL;
+      dataptr : DataPointer; (* help pointer to data element *)
+  BEGIN (* NewDiagram *)
+    IF diagramok THEN
+      Clear(diagramwindow);
+      SetDotPos(diagramwindow, 120, 390);
+      ix := 0;
+      WHILE (ix <= HIGH(title)) AND (title[ix] # 0C) DO
+        WriteChar(diagramwindow, title[ix]);
+        ix := ix + 1;
+      END;
+      (* return allocated data elements *)
+      WHILE datahead # NIL DO
+        dataptr := datahead;
+        datahead := datahead^.nextdata;
+        DISPOSE(dataptr);
+      END;
+    END;
+    ok := diagramok;
+  END NewDiagram;
+
+  PROCEDURE AddDiagramData(
+              datavalue : REAL; (* value of represented data *)
+              datalegend : ARRAY OF CHAR; (* legend to value *)
+              datapattern : CARDINAL); (* number of pattern in diagram *)
+    VAR
+      ix : CARDINAL; (* index *)
+      dataptr : DataPointer; (* help pointer to data element *)
+  BEGIN (* AddDiagramData *)
+    IF diagramok THEN
+      IF datahead = NIL THEN
+        NEW(datahead);
+        dataptr := datahead;
+      ELSE
+        dataptr := datahead;
+        WHILE dataptr^.nextdata # NIL DO dataptr := dataptr^.nextdata END;
+        NEW(dataptr^.nextdata);
+        dataptr := dataptr^.nextdata;
+      END;
+      (* dataptr references new entry *)
+      WITH dataptr^ DO
+        nextdata := NIL;
+        value := datavalue;
+        ix := 0;
+        WHILE (ix <= HIGH(datalegend)) AND (datalegend[ix] # 0C) DO
+          legend[ix] := datalegend[ix];
+          ix := ix + 1;
+        END;
+        IF ix <= HIGH(legend) THEN legend[ix] := 0C END;
+        pattern := datapattern;
+        percent := 0.0;
+      END;
+    END;
+  END AddDiagramData;
+
+  PROCEDURE PaintDiagram;
+    VAR
+      ok : BOOLEAN; (* operation successful *)
+      total : REAL; (* total of data values *)
+      dataptr : DataPointer; (* help pointer to data element *)
+  BEGIN (* PaintDiagram *)
+    IF diagramok AND (datahead # NIL) THEN
+      (* accumulate total *)
+      total := 0.0;
+      dataptr := datahead;
+      WHILE dataptr # NIL DO
+        total := total + dataptr^.value;
+        dataptr := dataptr^.nextdata;
+      END;
+      (* calculate percentage *)
+      total := total / 100.0;
+      dataptr := datahead;
+      WHILE dataptr # NIL DO
+        dataptr^.percent := dataptr^.value / total;
+        dataptr := dataptr^.nextdata;
+      END;
+      InitPie(diagramwindow, 200, 180, 150, ok);
+      InitLegend(diagramwindow, 400, 0, diagramwindow^.innerblk.w - 400, 330);
+      IF ok THEN
+        dataptr := datahead;
+        WHILE dataptr # NIL DO
+          PieSlice(dataptr^.percent, dataptr^.pattern);
+          NextLegend(dataptr^.legend, dataptr^.pattern);
+          dataptr := dataptr^.nextdata;
+        END;
+      END;
+    END;
+  END PaintDiagram;
+
+BEGIN (* graphDiagram *)
+  OpenWindow(diagramwindow, 10, 350, 620, 470, "Diagram", diagramok);
+  IF diagramok THEN
+    LoadFont(diagramwindow, "Timesroman20", diagramok);
+  END;
+  datahead := NIL;
+END graphDiagram.

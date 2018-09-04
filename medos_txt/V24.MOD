@@ -1,0 +1,79 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          V24:                        *
+*                                      *
+*          V24 reads from and writes   *
+*          to the asyncronous V24      *
+*          connection. No conversions  *
+*          are included.               * 
+*                                      *
+*          Version 2    5.10.80        *    
+*          Version 4.2   9.5.83        *
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+IMPLEMENTATION MODULE V24;
+
+  FROM SYSTEM IMPORT WORD;
+
+  CONST
+    linedata   =  4;
+    linestatus =  5;
+    donebit    = 14;
+    freebit    = 15;
+
+    (* Instructs for handling input and output.  *)
+    readw  = 240B;         (* read a word from channel *)
+    writew = 241B;         (* write a word to channel  *)
+
+
+  PROCEDURE Get(channel: CARDINAL; VAR w: WORD);
+  CODE
+    readw
+  END Get;
+
+  PROCEDURE Put(channel: CARDINAL; w: WORD);
+  CODE
+    writew
+  END Put;
+
+
+  PROCEDURE BusyRead(VAR ch: CHAR; VAR got: BOOLEAN);
+    VAR status: BITSET;
+  BEGIN
+    Get(linestatus, status);
+    got := donebit IN status;
+    IF got THEN
+      Get(linedata, ch)
+    END
+  END BusyRead;
+
+  PROCEDURE Read(VAR ch: CHAR);
+    VAR got: BOOLEAN;
+  BEGIN 
+    REPEAT
+      BusyRead(ch, got)
+    UNTIL got
+  END Read;
+
+  PROCEDURE Write(ch: CHAR);
+    VAR status: BITSET;
+  BEGIN
+    REPEAT
+      Get(linestatus, status)
+    UNTIL freebit IN status;
+    Put(linedata, ch)
+  END Write;
+
+END V24.
+

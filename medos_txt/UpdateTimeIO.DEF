@@ -1,0 +1,19 @@
+DEFINITION MODULE UpdateTimeIO; (* WW 15.6.83 *)
+
+FROM Monitor IMPORT
+  Time;
+
+EXPORT QUALIFIED
+  ReadTime, WriteTime;
+
+TYPE
+  CharWriteProc = PROCEDURE (CHAR);
+  CharReadProc = PROCEDURE (VAR CHAR);
+
+
+PROCEDURE ReadTime (VAR time: Time; VAR ok: BOOLEAN;
+                    VAR ch: CHAR; Read: CharReadProc);
+
+PROCEDURE WriteTime (time: Time; Write: CharWriteProc; zerofill: CHAR);
+
+END UpdateTimeIO.

@@ -1,0 +1,192 @@
+A c
+Table of Contents
+C Y15 c
+7.10.82
++ Y10 y3 w40 t75 110 150 200 500.
+1.  Introduction                                            1001
+    1.1.   Handbook Organization                            1001
+           1.1.1.   Overview of the Chapters                1001
+           1.1.2.   Page Numbers                            1001
+    1.2.   Overview of Lilith                               1002
+           1.2.1.   Software                                1002
+           1.2.2.   Hardware                                1002
+    1.3.   References                                       1002
+
+2.  Running Lilith                                          2001
+    2.1.   Getting Started                                  2001
+    2.2.   Exchange of the Disk Cartridge                   2001
+    2.3.   Termination of a Session                         2002
+
+3.  Running Programs                                        3001
+    3.1.   The Command Interpreter                          3001
+           3.1.1.   Program Call                            3001
+           3.1.2.   Typing Aids                             3001
+           3.1.3.   Loading and Execution Errors            3002
+    3.2.   Command Files                                    3004
+    3.3.   Program Loading                                  3004
+
+4.  Things to Know                                                        4001
+    4.1.   Special Keys                                                   4001
+    4.2.   File Names                                                     4001
+           4.2.1.   File Names Accepted by the Module FileSystem          4001
+           4.2.2.   File Name Extensions                                  4002
+           4.2.3.   File Name Input from Keyboard                         4002
+    4.3.   Program Options                                                4002
+    4.4.   The Mouse                                                      4003
+p
+5.  The Editor                                                       5001
+    5.1.   Introduction                                              5001
+    5.2.   Starting the Editor and Entry of New Text                 5002
+    5.3.   Positioning the Document                                  5002
+           5.3.1.   Scrolling                                        5002
+           5.3.2.   Flipping                                         5002
+    5.4.   Insert Characters at Different Locations                  5003
+    5.5.   Activating the Menu and Making a Selection                5004
+    5.6.   Delete, Move, or Copy Text                                5004
+    5.7.   Termination of an Editing Session                         5005
+    5.8.   Rescue from Abnormal Termination and Other Errors         5005
+    5.9.   Searching                                                 5005
+    5.10.  Working with Windows                                      5006
+           5.10.1.   Open a Window                                   5006
+           5.10.2.   Open a Document                                 5006
+           5.10.3.   Change the Size of a Window                     5007
+           5.10.4.   Close a Window or a Document                    5007
+    5.11.  Accelerators                                              5007
+    5.12.  User Profile and User Guidance                            5008
+    5.13.  Special Characters                                        5009
+
+6.  Utility Programs                                         6001
+    6.1.   directory                                         6002
+    6.2.   delete, protect, and unprotect                    6004
+    6.3.   copy and rename                                   6005
+    6.4.   list                                              6006
+    6.5.   inspect                                           6007
+    6.6.   xref                                              6008
+    6.7.   link                                              6009
+    6.8.   decode                                            6010
+    6.9.   layout                                            6011
+    6.10.   hermes                                           6012
+    6.11.   hpcopy                                           6013
+    6.12.   applecopy                                        6014
+    6.13.   boot and altboot                                 6016
+
+7.  The Compiler                                         7001
+    7.1.   Glossary and Examples                         7001
+    7.2.   Compilation of a Program Module               7002
+    7.3.   Compilation of a Definition Module            7002
+    7.4.   Symbol Files Needed for Compilation           7002
+    7.5.   Compiler Output Files                         7003
+    7.6.   Program Options for the Compiler              7003
+    7.7.   Compilation Options in Compilation Units      7004
+    7.8.   Module Key                                    7004
+    7.9.   Program Execution                             7004
+    7.10.   Value Ranges of the Standard Types           7005
+    7.11.   Differences and Restrictions                 7005
+    7.12.   Compiler Error Messages                      7007
+p
+8.  The Debugger                                              8001
+    8.1.   Starting the Debugger                              8001
+    8.2.   General Debugging Dialog                           8001
+    8.3.   The Debugger Windows and Their Commands            8001
+           8.3.1.   The Procedure Chain Window                8001
+           8.3.2.   The Program Window                        8002
+           8.3.3.   The Data Window                           8002
+           8.3.4.   The Variable Window                       8003
+           8.3.5.   The Dialog Window                         8003
+           8.3.6.   The Memory Window                         8004
+           8.3.7.   The Load Map Window                       8004
+           8.3.8.   The Process Window                        8004
+           8.3.9.   The Screen Window                         8005
+           8.3.10.   The Background Commands                  8005
+    8.4.   An Example                                         8007
+           8.4.1.   Screen with Minimal Windows               8007
+           8.4.2.   Screen with Additional Opened Windows     8008
+
+9.  The Medos-2 Interface                                                       9001
+    9.1.   Module FileSystem                                                    9002
+           9.1.1.   Introduction                                                9002
+           9.1.2.   Definition Module FileSystem                                9002
+           9.1.3.   Simple Use of Files                                         9004
+                    9.1.3.1.   Opening, Closing, and Renaming of Files          9004
+                    9.1.3.2.   Reading and Writing of Files                     9005
+                    9.1.3.3.   Positioning of Files                             9005
+                    9.1.3.4.   Examples                                         9006
+           9.1.4.   Advanced Use of Files                                       9008
+                    9.1.4.1.   The Procedures FileCommand and DirectoryCommand    9008
+                    9.1.4.2.   Internal File Identification and External File Name    9009
+                    9.1.4.3.   Permanency of Files                              9010
+                    9.1.4.4.   Protection of Files                              9010
+                    9.1.4.5.   Reading, Writing, and Modifying Files            9011
+                    9.1.4.6.   Examples                                         9013
+           9.1.5.   Implementation of Files                                     9015
+           9.1.6.   Files on Cartridges for Honeywell Bull D120/D140 Disk Drives     9016
+                    9.1.6.1.   Main Characteristics and Restrictions            9016
+                    9.1.6.2.   System Files                                     9016
+                    9.1.6.3.   Error Handling                                   9016
+    9.2.   Module Program                                                       9018
+           9.2.1.   Introduction                                                9018
+           9.2.2.   Definition Module Program                                   9018
+           9.2.3.   Execution of Programs                                       9019
+           9.2.4.   Heap                                                        9021
+           9.2.5.   Error Handling                                              9022
+           9.2.6.   Object Code Format                                          9023
+    9.3.   Storage                                                              9025
+    9.4.   Terminal                                                             9027
+p
+10.  Screen Software                                       10001
+    10.1.   Summary                                        10001
+    10.2.   Screen                                         10002
+    10.3.   TextScreen                                     10007
+    10.4.   WindowHandler                                  10008
+    10.5.   CursorStuff                                    10017
+    10.6.   CursorRelations                                10020
+    10.7.   WindowDialogue                                 10021
+    10.8.   ScreenResources0                               10024
+    10.9.   Lines                                          10026
+
+11.  Library Modules                                       11001
+    11.1.   InOut                                          11002
+    11.2.   RealInOut                                      11004
+    11.3.   Mouse                                          11005
+    11.4.   LineDrawing                                    11006
+    11.5.   MathLib0                                       11007
+    11.6.   OutTerminal                                    11008
+    11.7.   OutFile                                        11009
+    11.8.   OutWindow                                      11010
+    11.9.   ByteIO                                         11011
+    11.10.   ByteBlockIO                                   11012
+    11.11.   FileNames                                     11014
+    11.12.   Options                                       11016
+    11.13.   Line                                          11018
+    11.14.   V24                                           11019
+    11.15.   String                                        11020
+
+12.  Modula-2 on Lilith                                      12001
+    12.1.   Code Procedures                                  12001
+    12.2.   The Module SYSTEM                                12001
+    12.3.   Data Representation and Parameter Transfer       12002
+           12.3.1.   Data Representation                     12002
+           12.3.2.   Parameter Transfer                      12004
+
+13.  Hardware Problems and Maintenance                             13001
+    13.1.   What to Do if You Assume some Hardware Problems        13001
+    13.2.   DiskCheck                                              13002
+    13.3.   DiskPatch                                              13003
+           13.3.1.   Introduction                                  13003
+           13.3.2.   Commands                                      13003
+           13.3.3.   How to Initialize a New Cartridge             13005
+           13.3.4.   The most Frequent Problems with Your Disk     13005
+
+14.  Application Programs                                          14001
+    14.1.   Skylla and Zeus: A Pair of Text Formatters             14002
+           14.1.1.   The Input Text                                14002
+           14.1.2.   Formatting Commands                           14002
+           14.1.3.   Fonts                                         14003
+           14.1.4.   Guidelines for the Preparation of Texts       14003
+    14.2.   SIL: An Editor for Line Drawings                       14004
+           14.2.1.   Creating Objects                              14004
+           14.2.2.   Operations on Objects                         14004
+           14.2.3.   Other Commands                                14005
+           14.2.4.   Input and Output of Diagrams                  14006
+           14.2.5.   Hardcopy                                      14006
+           14.2.6.   Program SilCheck                              14006

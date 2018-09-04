@@ -1,0 +1,650 @@
+********************************************************************************
+********************************************************************************
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                       MM      MM  IIII   AAAAAAAA                        ***
+***                       MMM    MMM  IIII  AAAAAAAAAA                       ***
+***                       MMMM  MMMM   II   AA      AA                       ***
+***                       MM MMMM MM   II   AA      AA                       ***
+***                       MM  MM  MM   II   AAAAAAAAAA                       ***
+***                       MM      MM   II   AAAAAAAAAA                       ***
+***                       MM      MM   II   AA      AA                       ***
+***                       MM      MM   II   AA      AA                       ***
+***                       MM      MM  IIII  AA      AA                       ***
+***                       MM      MM  IIII  AA      AA                       ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+***                       Micro-Instruction  ASSEMBLER                       ***
+***                       for  the  P C  *L I L I T H*                       ***
+***                                                                          ***
+***                                                                          ***
+***                       Version 19          20.07.81                       ***
+***                       W. Winiger         G. Schild                       ***
+***                                                                          ***
+***                                                                          ***
+***                                                                          ***
+********************************************************************************
+********************************************************************************
+
+                History
+                =======
+                13: T-
+                14: speed field implemented (bit 15 of the UInstr )
+                15: speed categories implemented
+                16: P and M registers introduced
+                    opcodes printed in listing
+                    binary code written in the MOTOROLA format
+                                split in five files
+                17: bus destination BNK added
+                    random access map concept introduced
+                18: translated into MODULA2
+                               split in seven modules
+                    reduced speed categories (only "-" and "S"=slow)
+                    local label concept introduced.
+                                according options added
+                                (.$L-   .$L+   .$L* )
+                    binary code and map written in the format for 
+                                the PROMBurner
+                                united binary code in one file
+                19: binary code written optional in the PROMBurner format
+                                or in MOTOROLA format on five files
+                                or both
+       Inhalt
+       ______
+0      Einleitung
+       __________
+1      Formate
+       _______
+1.1    Micro Instruktions Format
+1.2    Micro Assembler Format
+1.3    Binƒre Files
+1.3.1  Allgemeines
+1.3.2  Das Code-File f…r das PROMBurner-Format
+1.3.3  Die Code-Files f…r das Motorola-Format
+1.3.4  Das Map-File
+1.4    Das Input-File
+1.5    Das Listing
+
+2      Instruktionen
+       ____________
+2.1    Die regulƒre Instruktion
+2.2    Die Kontroll-Instruktion
+2.3    Die Pseudo-Instruktion ( Assembler Options )
+
+3      Fehlermeldungen
+       _______________
+
+########################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 0      Einleitung
+        __________
+Mit dem Command  "mia"  wird der Micro-Instruction-Assembler der Lilith gestartet. Er 
+fragt nach dem Input-File (default "Interpreter.TXT"), das er anschliessend liest und
+assembliert.
+Der produzierte Output besteht aus einem Listing (extension LST) und falls fehlerfrei 
+assembliert wurde aus einer allfƒlligen Map auf dem Listing und einem Map-File (ex-
+tension MAP) und entweder einem Code-File (extension BIN) im PROMBurner-Format und/oder
+f…nf Code-Files (extension BM1 BM2 BM3 BM4 BM5) im Motorola-Format.
+Mit dem Micro-Instruction-Assembler kann also nicht direkt die Maschine programmiert
+werden, sondern lediglich die Daten f…r die zu brennenden ROM's bereitgestellt werden.
+1         Formate
+          _______
+1.1    Micro Instruktions Format
+       ________________________
+a) regulƒre Instruktion ohne Konstante
+
+     |            4|            3|            2|                 1|              0| bytes
+     |39           |31           |23           |15                |7             0| bits
+     +-------------+-------------+-------------+------------------+---------------+
+      39   36    33  30  28     24     20  18   15 14 13 12 11     7       3     0
+     +----+-----+---+---+------+------+---+----+--+--+--+--+------+-------+-------+
+     |DST |FCT  |RS |C  |A     |B     |   |PC  |SP|K |S |E |SHFT  |BD     |BS     |  *)
+     +----+-----+---+---+------+------+---+----+--+--+--+--+------+-------+-------+
+     |D   |F    |RS |C  |A     |B     |SH |PC  |SP|K |S |E |SC    |BD     |BS     | **)
+     +----+-----+---+---+------+------+---+----+--+--+--+--+------+-------+-------+
+   0  Q    +     AQ  C   0..17  0..17  R   POP  -  1  S  0  0..17  ALU/PSH ALU      0
+   1  -    -+    AB  -C  -      -      M   RTN  S     -     -      MD      MD       1
+   2  B*   -     ZQ  0                 RR                          PC      PC       2
+   3  B    OR    ZB  1                 MR  JSR                     MAR     IR4      3
+   4  BQR  &     ZA                    -   -                       SR      IR       4
+   5  BR   -&    DA                        LOP                     MDS     IR-      5
+   6  BQL  XOR   DQ                                                IOA     IR*      6
+   7  BL   -XR   DZ                        JMP                     IOD     IOD      7
+  10                                                               INM     INM     10
+  11                     M      M                                                  11
+  12                     P      P                                                  12
+  13                     H      H                                                  13
+  14                     S      S                                                  14
+  15                     G      G                                  BNK             15
+  16                     L      L                                  F       F       16
+  17                     T      T                                  -/POP   -       17
+
+  *) Nomenklatur gemƒss dem Micro Assembler Format (das SHFT des Micro Assembler Formats
+     enthƒlt sowohl SH wie SC des Micro Instruktions Formats).
+ **) Nomenklatur (soweit gegen…ber dem Micro Assembler Format geƒndert) der Literatur
+     zum AMD2901 angepasst.
+
+
+b) regulƒre Instruktion mit Konstante
+
+     |            4|            3|            2|                 1|              0| bytes
+     |39           |31           |23           |15                |7             0| bits
+     +-------------+-------------+-------------+------------------+---------------+
+      39   36    33  30  28     24     20  18   15 14 13 12 11     7       3     0
+     +----+-----+---+---+------+------+---+----+--+--+--+--+------+-------+-------+
+     |D   |F    |RS |C  |A     |B     |SH |PC  |SP|K |S |E |SC    |BD     |BS     |
+     +----+-----+---+---+------+------+---+----+--+--+--+--+------+-------+-------+
+                                                   1     1         0..377
+
+
+c) Kontroll Instruktion
+
+     |            4|            3|            2|                 1|              0| bytes
+     |39           |31           |23           |15                |7             0| bits
+     +-------------+-------------+-------------+------------------+---------------+
+      39                  27               18   15 14                            0
+     +-------------------+----------------+----+--+--+----------------------------+
+     |PA                 |CC              |PC  |SP|K |                            |
+     +-------------------+----------------+----+--+--+----------------------------+
+      0..7777              R C Z V F S H E         0
+      Label               -
+                          T 
+
+     Condition Codes:
+     R   Request             C   Carry
+     Z   Zero                V   Overflow
+     F   Firstbit            S   Corrected Sign (:= F v V)
+     H   Halfword bit        E   Stack Empty
+
+Alle Zahlen sind oktal.
+1.2    Micro Assembler Format
+       ______________________
+
+Dies ist das Format des Assembler Inputs (maximal 80 Zeichen pro Zeile)
+
+a) Regulƒre Instruktion
+
+   +------+--+----+----+---+---+---+---+--------+---+----+--+--+----+----+--------+
+   |LABEL |K |DST |FCT |RS |C  |A  |B  |SHFT    |SP |PC  |S |E |BD  |BS  |COMMENT |
+   +------+--+----+----+---+---+---+---+--------+---+----+--+--+----+----+--------+
+   |Label |1 |Q   |+   |AQ |C  |0  |0  |R  0..17|S  |POP |S |0 |ALU |ALU |        |
+   |      |  |-   |-+  |AB |-C |.. |.. |M       |-  |RTN |- |  |MD  |MD  |        |
+   |      |  |B*  |-   |ZQ |0  |17 |17 |RR      |   |LOP |  |  |PC  |PC  |        |
+   |      |  |B   |OR  |ZB |1  |-  |-  |MR      |   |-   |  |  |MAR |IR4 |        |
+   |      |  |BQR |&   |ZA |   |M  |M  |-       |   |    |  |  |SR  |IR  |        |
+   |      |  |BR  |-&  |DA |   |P  |P  |        |   |    |  |  |MDS |IR- |        |
+   |      |  |BQL |XOR |DQ |   |H  |H  |        |   |    |  |  |IOA |IR* |        |
+   |      |  |BL  |-XR |DZ |   |S  |S  |        |   |    |  |  |IOD |IOD |        |
+   |      |  |    |    |   |   |G  |G  |        |   |    |  |  |INM |INM |        |
+   |      |  |    |    |   |   |L  |L  |        |   |    |  |  |BNK |F   |        |
+   |      |  |    |    |   |   |T  |T  |        |   |    |  |  |F   |-   |        |
+   |      |  |    |    |   |   |   |   |        |   |    |  |  |-   |    |        |
+   +------+--+----+----+---+---+---+---+--------+---+----+--+--+----+----+--------+
+
+
+
+b) Regulƒre Instruktion mit einer 8-bit-Konstanten als bus source
+
+   +------+--+----+----+---+---+---+---+--------+---+----+--+--+---------+--------+
+   |LABEL |K |DST |FCT |RS |C  |A  |B  |SHFT    |SP |PC  |S |E |N        |COMMENT |
+   +------+--+----+----+---+---+---+---+--------+---+----+--+--+---------+--------+
+   |Label |1 |    |    |   |   |   |   |        |   |    |  |1 |0..377   |        |
+   +------+--+----+----+---+---+---+---+--------+---+----+--+--+---------+--------+
+
+
+
+c) Kontroll Instruktion
+ 
+   +------+--+---------------+------------------+---+----+---------------+--------+
+   |LABEL |K |PA             |CC                |SP |PC  |               |COMMENT |
+   +------+--+---------------+------------------+---+----+---------------+--------+
+   |Label |0 |0..7777        |  R C Z V F S H E |S  |POP |               |        |
+   |      |  |Label          |- R C Z V F S H E |-  |RTN |               |        |
+   |      |  |               |T                 |   |JSR |               |        |
+   |      |  |               |                  |   |LOP |               |        |
+   |      |  |               |                  |   |JMP |               |        |
+   |      |  |               |                  |   |-   |               |        |
+   +------+--+---------------+------------------+---+----+---------------+--------+
+
+
+
+d) Pseudo-Instruktionen
+
+Folgende Pseudo-Instruktionen haben ausser der Instruktion noch weitere Felder:
+
+.ORG n
+.MAP n {,n}
+.$L+ ch
+.$L* ch
+
+wobei n eine oktale Zahl, ch ein CHAR ist.
+
+
+e) Kommentar
+
+Das Feld zwischen einer abgeschlossenen Instruktion und dem Zeilenende ist immer
+ein Kommentarfeld, das nicht interpretiert wird. Das gilt sowohl f…r regulƒre und
+Kontroll-, wie auch f…r alle Pseudo-Instruktionen, insbesondere f…r die "Kommentar-
+Instruktionen" :   ". " , "* " und "$ ".
+
+
+Alle Zahlen sind oktal.
+1.3    Binƒre Files
+       ____________
+
+1.3.1  Allgemeines
+       ___________
+Binƒre Files k„nnen in zwei verschiedenen Formaten geschrieben werden. Einerseits
+steht das PROMBurner-Format zur Verf…gung (f…r den Normalfall) und andererseits
+kann auch das Motorola-Format verwendet werden.Die binƒren Files werden nur ge-
+schrieben, falls beim Assemblieren keine Fehler entdeckt wurden.
+
+a) Das PROMBurner-Format
+   _____________________
+Dieses Format teilt das File in Bl„cke auf, die alle denselben Aufbau haben:
+
+  1 word    hi address   des nƒchsten Blocks im File
+  1 word    lo address   des nƒchsten Blocks im File
+  1 word    "d"  (f…r Datenblock)
+ 30 words   f…r 30 CHAR Blockname. Hier steht der Filename mit der Extension
+            BIN resp MAP
+  1 word    width   Angabe …ber die Breite eines Datenwortes in Bits
+  1 word    lo der Ladeadresse
+  1 word    hi der Ladeadresse
+  ******    Daten der Breite width l…ckenlos bis zum nƒchsten Block
+
+F…r weitere Informationen …ber dieses Format siehe Diplomarbeit von Beat Frei:
+Programmiergerƒt f…r Festwertspeicher (Fr…hling 81). 
+
+b) Das Motorola-Format
+   ___________________
+Dieses Format schreibt die Daten byte-weise in hexadezimaler character-schreib-
+weise auf ein File mit folgender Struktur:
+
+  S0030000FC                             Startzeile
+  S1##$$##$$..##$$                       Datenzeile
+  | | | | |   | |
+  | | | | |   | +-------Checksumme  (:= 0FFh - ((Summe der Datenbytes + 
+  | | | | |   |           Summe der Adressbytes + Zƒhlerbyte) MOD 100h))
+  | | | | |   +---------letztes Datenbyte
+  | | | | +-------------erstes Datenbyte
+  | | | +---------------lo Byte der Ladeadresse
+  | | +-----------------hi Byte der Ladeadresse
+  | +-------------------Anzahl der Bytes, die auf dieser Zeile noch folgen
+  |                       (:= Anz(Datenbytes) + 2 (*Adr-Bytes*) + 1 (*Checksumme*))
+  +---------------------Startsymbol
+  S9030000FC                             Schlusszeile
+
+In dieser Darstellung steht ## und $$ f…r je ein beliebiges Byte, hexadezimal
+geschrieben. Zwischen den Bytes d…rfen keine Blanks stehen, und pro Zeile gibt
+es maximal 32 Datenbytes.
+
+
+1.3.2  Das Code-File f…r das PROMBurner-Format
+       _______________________________________
+Dieses File mit dem Namen "filename.BIN" ist im PROMBurner-Format geschrieben.
+Die Breite eines Datenwortes (width) ist 40. Innerhalb des Datenwortes sind 
+die Bytes in der Reihenfolge   0 1 2 3 4  geschrieben. Als Blockname steht bei
+jedem Block, n„tigenfalls auf 30 Zeichen gek…rzt, der Filename des BIN-Files.
+
+
+1.3.3  Die Code-Files f…r das Motorola-Format
+       ______________________________________
+Wahlweise kann der binƒre Code auch (zusƒtzlich oder ausschliesslich) auf f…nf 
+Code-Files im Motorola-Format geschrieben werden. mia fragt vor dem schreiben
+nach diesbez…glichen W…nschen. Die Motorola-Files haben die extensions BM1 .. BM5,
+wobei das File  *.BMi  das  (i-1)-te Byte jeder Instruktion enthƒlt. Die 
+Motorola-Files teilen den Code also vertikal auf.
+
+
+1.3.4  Das Map-File
+       ____________
+Dieses File mit dem Namen "filename.MAP" ist im PROMBurner-Format geschrieben.
+Die Breite eines Datenwortes (width) ist 12. Falls kein Eintrag in die MAP ge-
+macht wurde, wird dieses File auch bei fehlerfreiem Assemblieren nicht ge-
+schrieben. Andernfalls wird die volle MAP in genau einen Block geschrieben.
+Der Name des Blocks ist der n„tigenfalls auf 30 Zeichen gek…rzte Filename des
+MAP-Files.
+1.4    Das Input-File
+       ______________
+Der Input soll auf einem File mit der Extension TXT stehen. Dieses File wird zeilen-
+weise gelesen und verarbeitet. Jede Zeile muss entweder eine Instruktion im Micro-
+Assembler Format enthalten oder leer sein. Zwei Felder einer Micro-Assembler
+Instruktion sind durch ein oder mehrere Blanks voneinander getrennt.
+Die maximale Zeilenlƒnge ist 80 Zeichen.
+
+
+1.5    Das Listing
+       ___________
+Auf dem Assembler Listing mit dem Namen "filename.LST" beginnt jede Seite im Assembler-
+teil mit einem Header und einer Zeile, mit dem "empfohlenen" Micro-Assembler Format.
+Pro Seite werden maximal 60 Zeilen geschrieben. Die einzelnen Zeilen haben folgenden
+Aufbau:
+- hexadezimale Adresse der Instruktion  (f…r Pseudo-Instruktionen ist dieses Feld leer)
+- Code der Instruktion in 5 hexadezimal geschriebenen Bytes. Falls beim Assemblieren
+     Fehler entdeckt wurden, fehlt dieses Feld auf den ganzen Listing, damit die Listing-
+     zeile auf dem Bildschirm Platz hat.
+- Kopie des Inputs
+- Referenz der in dieser Instruktion verwendeten Register.
+Am Schluss wird das Listing in dieser Reihenfolge ergƒnzt:
+- Liste der nicht referenzierten Label (wird nur geschrieben, wenn es solche hat)
+- Die Map, bei der der Mapindex oktal und hexadezimal, die Micro-Code-Memory-Adresse
+     aber nur hexadezimal geschrieben werden. Nicht verwendete Map-Felder werden
+     mit  "****"  gekennzeichnet. Wurde nichts in die Map eingetragen, so wird die
+     ganze Map weggelassen.
+- Eine Fehlerliste (analog dem Pascal), in der die aufgetretenen Fehler benannt werden.
+
+Fehlerbehandlung.  Auf dem Listing wird, analog dem Modula-Compiler, pro Fehler eine
+________________   Zeile eingeschoben, die im Adressfeld mit  "****"  gekennzeichnet
+ist, und die die Fehlerstelle mit einem  "^" , gefolgt von einer Referenz auf die 
+Fehlerliste, markiert. Da das Listing mit Fehlern auf dem Bildschirm Platz hat (siehe
+oben), k„nnen die Fehler mit Hilfe des Editors gesucht werden (falls das Listing-
+File k…rzer ist als 32 K ).
+2      Instruktionen
+       ____________
+Bei jeder Instruktion wird das Feld hinter der abgeschlossenen Instruktion als Kommentar
+betrachtet und nicht interpretiert. Bei allen Nicht-Pseudo-Instruktionen wird das erste
+Feld, sofern sein erster Character nicht  "0" , "1" , "." , "*" , "$" ist, als Label
+betrachtet. Label sind beliebige Zeichenfolgen, die nicht mit den obigen Character
+beginnen, und die nicht lƒnger als 10 Zeichen sind. Lokale Label siehe unter Pseudo-
+Instruktionen.
+
+ 
+2.1    Die regulƒre Instruktion
+       _________________________
+a) K (=ALU enable)
+   _______________
+F…r regulƒre Instruktionen steht hier "1".
+
+b) DST (=Dstination des Resultates der ALU)
+   ________________________________________
+"Q"  : AO := F; Q := F
+"-"  : AO := F
+"B*" : AO := R(Aport); R(Bport) := F
+"B"  : AO := F; R(Bport) := F
+"BQR": AO := F; R(Bport) := F/2; Q := Q/2 + 2**15 * F[0]
+"BR" : AO := F; R(Bport) := F/2
+"BQL": AO := F; Q := 2*Q; R(Bport) := 2*F + Q[15]
+"BL" : AO := F; R(Bport) := 2*F
+
+Hier bedeutet: AO       der ALU-Output zum BUS oder Stack
+               F        das Resultat der ALU-Berechnung
+               R(Xport) das Register, dessen Name im Feld X (=A,B) steht.
+
+c) FCT (=Function der ALU)
+   _______________________
+"+"  :  F := R + S + CA
+"-+" :  F := S - R - 1 + CA
+"-"  :  F := R - S - 1 + CA
+"OR" :  F := R OR S
+"&"  :  F := R AND S
+"-&" :  F := NOT (R AND S)
+"XOR":  F := R XOR S (exclusiv OR)
+"-XR":  F := NOT (R XOR S)
+
+Hier bedeutet: R,S   die beiden Operanden, bestimmt durch das Feld ALU-Source
+               CA    das Carry-Bit
+
+d) RS (=Source, d.h. Operanden der ALU)
+   ____________________________________
+"AQ" : R = R(Aport); S = Q
+"AB" : R = R(Aport); S = R(Bport)
+"ZQ" : R = 0; S = Q
+"ZB" : R = 0; S = R(Bport)
+"ZA" : R = 0; S = R(Aport)
+"DA" : R = D; S = R(Aport)
+"DQ" : R = D; S = Q
+"DZ" : R = D; S = 0
+
+Hier bedeutet: D   direkt Input zur ALU vom BUS oder Stack.
+
+e) C (=Carry)
+   __________
+"0" : CA := 0
+"1" : CA := 1
+"C" : CA := Carry der letzten ALU-Operation
+"-C": CA := NOT (Carry der letzten ALU-Operation)
+
+f) A,B (=Ports, symbolische Register)
+   __________________________________
+"0" - "17": oktale Nummer des zu verwendenden Registers
+"T"       : oberstes Element des Expression-Stack (R17)
+"L"       : Basisregister zur lokalen Prozedur (R16)
+"G"       : Basisregister zum globalen Modul (R15)
+"S"       : Stackpointer zum Prozedurstack im Speicher (R14)
+"H"       : Stackgrenze (R13)
+"P"       : Prozessregister (R12)
+"M"       : Maske (R11)
+
+g) SHFT (=Shift)
+   _____________
+Erstes Feld des Shift: 
+"-"  : kein Shift
+"M"  : Maskierung gemƒss Shiftcount
+"R"  : Rotate right gemƒss Shiftcount
+"MR" : Maskierung gemƒss Shiftregister
+"RR" : Rotate right gemƒss Shiftregister
+ 
+Zweites Feld des Shift (= Shiftcount):
+"-"        : f…r Shift = "MR" oder "RR"
+"0" - "17" : oktaler Shiftcount f…r Shift = "M" oder "R" 
+
+h) SP (=micro Clock)
+   _________________
+"-" : normale Instruktion
+"S" : slow Instruktion
+
+i) PC (=Program Control)
+   _____________________
+"RTN" : Return
+"LOP" : Loop
+"POP" : Decrement Micro-SP
+"-"   : Continue
+
+k) S (=Stack enable)
+   _________________
+"-" : Stack disabled
+"S" : Stack enabled, BUSdest = ALU : PSH
+                     BUSdest # ALU : POP
+
+l) E (=Constant enable)
+   ____________________
+"0" : die letzten acht Bit der Instruktion enthalten BUS-Adressen
+"1" : die letzten acht Bit der Instruktion werden als Konstante auf den BUS zur ALU
+      geschickt.
+
+Falls E = "1" :
+"0" - "377": oktale Konstante
+
+Falls E = "0" :
+m) BD (=BUS Destination)
+   _____________________
+"ALU" : ALU (zusammen mit "S" f…r Stack enabled und BD = "-" : PSH)
+"MD"  : Memory Data
+"PC"  : Program Counter
+"MAR" : Memory Address Register
+"SR"  : Shift Register
+"MDS" : Multiply / Divide - Step
+"IOA" : I/O - Address (Kanal)
+"IOD" : I/O - Data
+"INM" : Interrupt Mask
+"BNK" : extended Memory Bank
+"F"   : Frame Register
+"-"   : keine BUS-Aktivitƒt (zusammen mit "S" f…r Stack enabled : POP)
+n) BS (=BUS Source)
+   ________________
+"ALU" : ALU
+"MD"  : Memory Data
+"PC"  : Program Counter
+"IR4" : untere 4 Bits des nƒchsten Bytes im Instruktionsregister
+"IR"  : nƒchstes Byte des Instruktionsregisters
+"IR-" : nƒchstes Byte des Instruktionsregisters (oberes Byte := 11111111 )
+"IR*" : nƒchstes Byte des Instruktionsregisters (ohne Instruction-Fetch, falls dies
+        das letzte Byte im Instruktionsregister war)
+"IOD" : I/O - Data
+"INM" : Interrupt Mask
+"F"   : Frame Register
+"-"   : es wird nichts auf den BUS geschickt
+        (zusammen mit BD = "ALU": Push ohne BUS-Aktivitƒt)
+
+
+
+2.2    Die Kontroll-Instruktion
+       ________________________
+a) K (=ALU enable)
+   _______________
+F…r Kontroll-Instruktion steht hier eine  "0".
+
+b) PA (=Program Address)
+   _____________________
+"0" - "7777": absolute Adresse (oktal)
+<label>     : Label als symbolische Adresse.
+
+c) CC (=Condition Code)
+   ____________________
+"T": TRUE (unconditional) Jump, darf nicht mit andern Codes oder mit der Polaritƒt
+     kombiniert werden.
+"-": False-Jump (das "-" muss direkt vor den Condition-Codes stehen und negiert
+     die Bedeutung der ganzen Kombination)
+
+Von den folgenden Codes k„nnen mehrere (ohne Blanks) nebeneinander gesetzt werden.
+Sie sind durch OR miteinander verkn…pft:
+"R": Interrupt Request
+"C": Carry
+"Z": Zero
+"V": Overflow
+"F": Firstbit
+"S": Corrected Sign  (:= F v V)
+"H": Halfword Bit  (= Vorzeichen des lower Byte)
+"E": Expression Stack empty
+
+d) SP (=micro Clock)
+   _________________
+Siehe regulƒre Instruktion.
+
+e) PC (=Program Control)
+   ______________________
+"JSR" : Jump Subroutine
+"JMP" : Jump
+Sonst wie regulƒre Instruktion.
+
+
+
+2.3    Die Pseudo-Instruktion ( Assembler Options )
+       ____________________________________________
+a) .NOP
+   ____
+Im Micro-Code-Memory wird Platz f…r eine Instruktion ausgespart
+
+b) .ORG
+   ____
+Syntax: .ORG n   (n eine oktale Zahl) 
+Die Ladeadresse wird auf den Wert n gesetzt.
+
+c) .MAP
+   ____
+Syntax: .MAP n{,n}  (n sind oktale Zahlen)
+Die aktuelle Ladeadresse wird in der Map auf den Platz/ die Plƒtze n{,n} geschrieben.
+
+d) .
+   __
+Dies ist eine Kommentarzeile, die nicht interpretiert wird.
+
+e) *
+   __
+Dies ist eine Kommentarzeile, die nicht interpretiert wird.
+
+f) $
+   __
+Dies ist eine Kommentarzeile, nach der das Listing auf der nƒchsten Seite weiter-
+geschrieben wird.
+
+g) .$T+
+   ____
+Setzt verschiedene Plausibilitƒtstests (bez…glich verwendeter Register und BUS-activitƒt)
+inkraft. Diese Option ist als Default-Wert gesetzt.
+
+h) .$T-
+   ____
+Setzt obige Plausibilitƒtstests ausser kraft.
+
+i) .$L-
+   ____
+Diese Option gibt an, dass alle Label als global zu betrachten sind. Wie die beiden
+folgenden Optionen hat auch diese zur Folge, dass der Scope allfƒlliger lokaler Label
+abgeschlossen wird. Diese Option ist als Default-Wert gesetzt.
+
+k) .$L+
+   ____
+Syntax: .$L+ ch  (ch ein beliebiger Character)
+Kennzeichet alle Label, ausser denen die mit ch beginnen, als global.
+
+l) .$L*
+   ____
+Syntax: .$L* ch  (ch ein beliebiger Character)
+Kennzeichet alle Label, ausser denen die mit ch beginnen, als lokal.
+
+m) leere Zeile
+   ___________
+Dient nur zur Strukturierung des Listings.
+3      Fehlermeldungen
+       _______________
+ 1: '0' or '1' is expected
+ 2: unknown ALU destination
+ 3: unknown ALU function
+ 4: unknown ALU source
+ 5: unknown carry control
+ 6: unknown port address
+ 7: unknown shift control
+ 8: '-' or 'S'  is expected
+ 9: unknown program control
+10: illegal shift count
+11: shift count = 0 is required
+12: this shift needs a shift count
+13: constant expected
+15: illegal BUS destination
+16: illegal BUS source
+17: there are still open Labels  ----- see special List
+18: there are undeclared local labels
+19: unknown condition code
+20: in a regular instruction 'call' is illegal
+21: end  of line before instruction is completed
+22: label or symbol is too long 
+23: octal numbers contain characters from '0' to '7'
+24: constant is too large
+25: map overflow  (map range is 0..255)   -----  stops assembling
+26: this label is defined twice
+27: this is a jump to a unknown (too high) address
+28: Micro Code Memory Overflow   -----  stops assembling
+29: the used shift needs a shift count
+30: this  combination of registers,destinations and sources is illegal
+31: wrong stack control
+32: unknown pseudo instruction
+33: '-' or 'S' is expected

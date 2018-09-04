@@ -1,0 +1,8 @@
+DEFINITION MODULE MDDataView; (* C. Binding, Ch. Jacobi *)
+
+  EXPORT QUALIFIED ShowProcData, ShowModData;
+
+  PROCEDURE ShowProcData(n: CARDINAL);
+  PROCEDURE ShowModData(m: CARDINAL);
+  
+END MDDataView.

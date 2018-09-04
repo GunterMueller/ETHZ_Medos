@@ -1,0 +1,26 @@
+DEFINITION MODULE SilDisplay;   (*NW 15.2.83*)
+  EXPORT QUALIFIED
+    BMWidth, BMHeight, PageWidth, PageHeight, FontHeight, Yorg,
+    PaintCursor, ShowChar, WriteString, PaintRectangle,
+    PaintMenu, RestoreMenuArea, InvertMenuField, UpLow,
+    LoadFont, SetTicks, ClearTicks, ClearMap;
+
+  CONST PageWidth = 640; PageHeight = 832;
+
+  VAR Yorg, BMWidth, BMHeight: INTEGER;
+      FontHeight, FontWidth: ARRAY [0..3] OF INTEGER;
+ 
+  PROCEDURE PaintCursor(x,y: INTEGER);
+  PROCEDURE PaintRectangle(k,x,y,w,h: INTEGER);
+  PROCEDURE WriteString(x,y: INTEGER; font: CARDINAL;
+               VAR s: ARRAY OF CHAR; i: CARDINAL);
+  PROCEDURE ShowChar(ch: CHAR; font: CARDINAL; VAR x,y: INTEGER);
+  PROCEDURE PaintMenu(x,y,n: INTEGER; s: ARRAY OF CHAR);
+  PROCEDURE RestoreMenuArea;
+  PROCEDURE InvertMenuField(n: INTEGER);
+  PROCEDURE UpLow(up: BOOLEAN);
+  PROCEDURE SetTicks;
+  PROCEDURE ClearTicks;
+  PROCEDURE ClearMap;
+  PROCEDURE LoadFont(f: CARDINAL; fName: ARRAY OF CHAR; VAR done: BOOLEAN)
+END SilDisplay.

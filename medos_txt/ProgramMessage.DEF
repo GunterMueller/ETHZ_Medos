@@ -1,0 +1,27 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          ProgramMessage              *
+*                                      *
+*          Version 2   4.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE ProgramMessage;
+
+  FROM Program IMPORT Status;
+
+  EXPORT QUALIFIED WriteStatus;
+
+  PROCEDURE WriteStatus(st: Status);
+
+END ProgramMessage.

@@ -1,0 +1,99 @@
+MODULE graph;
+
+  (* Copyright: DISER AG *)
+  (* Author: Leo Geissmann, DISER Zurich *)
+  (* Version: 1 *)
+  (* Date: 83.09.02 *)
+  (* Purpose: Program for graphical data representation *)
+
+  IMPORT
+    WindowHandler,
+    InOut,
+    RealInOut,
+    graphDiagram;
+
+  FROM WindowHandler IMPORT
+    Window, OpenWindow, CloseWindow, UseForDefault, LoadFont,
+    Clear, FullScreen;
+
+  FROM InOut IMPORT
+    Read, ReadString, ReadCard, Write, WriteLn, WriteString, termCH;
+
+  FROM RealInOut IMPORT
+    ReadReal;
+
+  FROM graphDiagram IMPORT
+    NewDiagram, AddDiagramData, PaintDiagram;
+
+  VAR
+    dialogwindow : Window;           (* window for dialog with user *)
+    ok : BOOLEAN;                    (* operations executed correctly *)
+    title : ARRAY [0 .. 23] OF CHAR; (* title of diagram *)
+
+  PROCEDURE AcceptYesNo(
+              VAR ok : BOOLEAN);     (* accepted *)
+    VAR
+      ch : CHAR;                     (* character to read *)
+  BEGIN (* AcceptYesNo *)
+    Read(ch);
+    ok := CAP(ch) = 'Y';
+    IF ok THEN WriteString("yes");
+    ELSE WriteString("no");
+    END;
+    WriteLn;
+  END AcceptYesNo;
+
+  PROCEDURE AcceptData;
+    VAR
+      value : REAL;                     (* value of a data element *)
+      legend : ARRAY [0 .. 23] OF CHAR; (* legend belonging to data *)
+      pattern : CARDINAL;               (* pattern for data *)
+      continue : BOOLEAN;               (* continue condition *)
+  BEGIN (* AcceptData *)
+    continue := TRUE;
+    WHILE continue DO
+      WriteLn;
+      WriteString("Data Value > ");
+      ReadReal(value);
+      WriteLn;
+      IF termCH # 33C THEN
+        WriteString("Legend > ");
+        ReadString(legend);
+        WriteLn;
+      END;
+      IF termCH # 33C THEN
+        WriteString("Pattern Number (1 .. 12) > ");
+        ReadCard(pattern);
+        WriteLn;
+      END;
+      IF termCH # 33C THEN
+        AddDiagramData(value, legend, pattern);
+      ELSE
+        PaintDiagram;
+        WriteLn;
+        WriteString("Further Data (y/n) > ");
+        AcceptYesNo(continue);
+      END;
+    END;
+  END AcceptData;
+
+BEGIN (* graph *)
+  OpenWindow(dialogwindow, 10, 10, 620, 330, "Dialog", ok);
+  IF ok THEN
+    LoadFont(dialogwindow, "Timesroman16", ok);
+    UseForDefault(dialogwindow);
+  END;
+  WHILE ok DO
+    Clear(dialogwindow);
+    WriteString("Diagram Title > ");
+    ReadString(title);
+    WriteLn;
+    NewDiagram(title, ok);
+    AcceptData;
+    WriteLn;
+    WriteString("New Diagram (y/n) > ");
+    AcceptYesNo(ok);
+  END;
+  CloseWindow(dialogwindow);
+  Clear(FullScreen());
+END graph.

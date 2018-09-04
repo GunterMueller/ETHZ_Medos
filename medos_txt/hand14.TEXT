@@ -1,0 +1,386 @@
+A c
+14.  Application Programs
+C Y15 c
+7.10.82
++
+This chapter describes some application programs on Lilith.
++ w15
+1List of the Programs0
+x25 t170 450.
+skylla         Text formatter with screen output  14.1.
+zeus           Text formatter with hardcopy output  14.1.
+sil            Editor for line drawings  14.2.
+silprint       Hardcopy of SIL-documents  14.2.5.
+SilCheck       Check on overlapping elements in SIL-documents  14.2.6.
+p B
+14.1.  Skylla and Zeus: A Pair of Text Formatters
++
+Niklaus Wirth  12.1.82, rev. 11.7.82
++
+The programs 1skylla0 and 1zeus0 are text formatters for the preparation
+of documents.  They operate
+in the style of conventional off-line formatters and are directed by
+commands inserted in the text.  We therefore consider them as an interim
+solution to be used until a versatile, interactive editor/formatter will
+be available.  skylla reads text files and displays the formatted text on the
+screen using up to 8 different fonts.  For actual printing, the companion
+program zeus has to be used which accepts the identical input.
+
+The programs first prompt for the selection of 1profile information0 which is stored
+on the User Profile.  Typing any key (except "a") selects the normal
+profile information.  For an alternate profile, "a" must be typed.  The necessary
+fonts are loaded according to this information.  Afterwards, the
+programs ask for the name of the file
+to be shown or printed.  The default extension of input file names is TEXT.
+
+zeus also asks the number of the first page,
+because it can automatically place page numbers.  If instead of specifying a number
+you reply with RETURN, no page numbers will be printed.  (If the page number is
+followed by a minus sign, page numbers will alternately be placed on the left and
+right sides of the page).  Finally, zeus asks for the number of copies to be
+printed.  You type a single
+digit.  Hence the maximum number of copies is restricted to 9.
+
+When a page is shown by skylla, type blank to get the next page.  When the file
+is terminated, the name of a next file is requested.  Type ESC to terminate the program.
+C Y15
+14.1.1.  The Input Text
++
+Text is prepared using the regular editor; all characters are freely
+available.  1Formatting commands0 are signalled by two control characters, namely
+CTRL-] (35C) and CTRL-DEL (37C).  CTRL-] is used at the beginning of a line to
+signal that this line consists of control information which is to be interpreted but not
+shown or printed.  CTRL-DEL occurs for the same purpose within the text.
+
+The text is subdivided into 1paragraphs.0  A new paragraph is started
+either by a line beginning with CTRL-] or by a blank line.  In the former case
+that line contains formatting commands only.  There exist three 1formatting
+modes0: Adjust, No adjust, and Center.  In the N and C modes, the text
+is copied character by character; blanks and RETURNs have their expected effect.
+In the A mode, the paragraph consists of words separated by either a (single)
+blank, or a RETURN.  The words are arranged on a line such that
+spaces are equally distributed and words are not broken at the end of the
+lines.  Note that
+if two words are separated by more than one blank, all except the first are
+considered as belonging to the second word; this allows to control individual
+spacing.  Words may consist of any characters, possibly preceded by blanks.
+C Y15
+14.1.2.  Formatting Commands
++
+A line starting with CTRL-] contains formatting commands only.  Each command
+is identified by a command character listed below and possibly some parameters.
+ Parameters usually denote sizes.  The unit is a "point" corresponding to about
+0.3 mm.  Commands are separated by blanks.
+ x 25  t 125. w15
+a enter Adjust mode.
+n enter No adjust mode.
+c enter Center mode.  (lines are centered and not adjusted)
+x n indent n points.  (counting from LeftMargin)
+y n space lines vertically by n points.
+Y n space paragraphs vertically by n points.
+w n insert white space of n points vertically.  If there is not enough space left on
+    page, insert it after one of the following paragraphs.
+f n use font n  (0 <= n < 8)  No blank after f! (see below)
+p start new page.
+i increment page number by 1 (skipping page for inserts).
+t n1 n2 ... nk    set tabs 1 ... k to positions  n1 ... nk.  k <= 10.
+ the last parameter nk must be followed by a period!  Sets mode to N.
+ (Tab values are not checked for validity!)
+<
+Note: Tab values are either absolute or relative to the left margin according to
+an option set by the User Profile.
++
+Example with absolute tabs at 100, 200, 300, 400, 500.
+t 100 200 300 400 500.
+ |  |  |  |  |
++ w15
+The following are macro commands, setting the layout parameters according to
+the table given below.  The table also specifies the parameters' default values.
+ x 25  t 150 200 250 300 350 400. w15
+1  mode  font  x  y  Y  intended purpose0
+
+default  N  0  0  2  6
+   +  A  0  0  2  4  regular text
+   -  N  6  0  2  4  program text, tables
+   =  N  7  0  2  4  program text, tables
+   <  A  3  0  2  4  notes
+   A  N  5  0  5  14 major titles
+   B  N  4  0  4  10 regular titles
+   C  N  2  0  2  8  subtitles
++ w15
+Format information 1within0 the text is indicated by the control character CTRL-DEL
+followed by either a digit 0 ... 7, indicating the font to be used subsequently,
+or a blank, indicating a tab.
+ A font change is accepted only if the new font fits into the current line
+height, which is determined by the current font height plus the given y parameter
+for line spacing.
+<
+Note: One point on the screen corresponds to 3 printing units.  Therefore zeus multiplies
+the specified parameter values by 3.
+C Y15
+14.1.3.  Fonts
++
+The fonts and the page size are chosen according to your skylla section in your
+user profile.  We recommend the following set of fonts as a standard:
+- Y5 x50  f0 t 150 320. w15
+0 TIMESROMAN12 normal text font
+f1
+1 TIMESROMAN12I italic
+f2
+2 TIMESROMAN12B bold face
+f3
+3 TIMESROMAN10 for notes
+f4
+4 TIMESROMAN16 for minor titles
+f5
+5 TIMESROMAN20 for major titles
+f6
+6 HELVETICA12
+f7
+7 GACHA12 for programs and tables (fixed width)
++ w15
+The maximum values for page size specification are:
+ top = 0 (160, if page numbering is requested), bottom = 2752, left = 0,
+right = 1848.  These numbers correspond to printing units, not to screen points.
+<
+Note: Printer fonts must be considered as proprietary, and you are not allowed to
+make these fonts available to people outside the Institute.
+C Y15
+14.1.4.  Guidelines for the Preparation of Texts
++
+1. Use formatting commands sparingly.  In particular, 1concentrate on the use of the
+provided macros.0
+ Y4
+2. Use the default fonts provided.
+
+3. Separate sentences with 2 blanks (after each period).
+
+4. Indent programs with x=25.
+
+5. Do 2not 0indent first line in paragraphs.
+
+6. As string quotes use the quote mark " (instead of the apostrophe ').
+p B
+14.2.  SIL: An Editor for Line Drawings
++
+Niklaus Wirth  30.6.81, rev. 11.7.1982
++
+Purpose: SIL is used for constructing and editing line drawings such as charts,
+tables in illustrations, and circuit diagrams.  These drawings may contain 1horizontal
+and vertical lines, text, and symbols0 - so-called macros - available from
+macro-libraries.  These libraries typically contain symbols for electronic components.
++
+You should read this introduction carefully while having a Lilith computer at
+your disposal in order to immediately follow the instructions given.
+
+When SIL is called (program name 1sil0), it asks: 7Profile: (-/c)0.  Answer by typing "c", if you wish to
+draw an electronic circuit, or by typing a blank otherwise.
+C Y15
+14.2.1.  Creating Objects
++
+SIL first requests an input file, because usually one wishes
+to work on an already existing diagram.  For the time being, merely type ESC.
+Now you may create objects, i.e. elements of a diagram.  A 1line0 is created by
+moving the cursor to the position where the line is to begin, pushing the middle
+key of the mouse (called the 1draw key0), then moving the cursor
+to the position where the endpoint is to be while keeping the key depressed, and
+releasing the key.  The line will automatically be made either horizontal or vertical.
+Try it a few times!
+
+Now let's create a 1textual object.0  Move the cursor to the position where you wish
+the text to begin.  Then simply type it!  You may type any printable character,
+including blanks.  RETURN will terminate the text; textual objects consist of
+sequences of words on a single line only.  The character DEL can be used to make
+quick corrections of typing errors; it causes the last character(s) to be erased.
+ Try inserting a few textual objects, each time moving the cursor to another
+position after typing RETURN.
+C Y15
+14.2.2.  Operations on Objects
++
+As that we have a few objects on the screen, we are ready to see what SIL can do
+to them.  In essence, it can 1move0, 1copy0, and 1delete0 them.  In order
+to designate an
+object to which such a command applies, we have to select that object.  In order to
+select a line, point at it with your cursor, then press the left key of the mouse
+(called the 1select key0), and release it.  Selection is shown by the line being drawn
+dotted.  (You should have noticed this when creating lines: a created line is
+automatically selected.)  If another object is selected, the formerly selected
+object is deselected.
+
+Now point at a text and select it: selection is indiacted by underlining.  Try it
+a few times. 
+
+Let us now move a selected object to another place: Point at it, then press the
+right key of the mouse (called the 1move key0) and move the cursor, while keeping
+the key depressed, by a few cm.  Now release the key: the selected object will be
+redrawn at the new place.
+
+Actually, when you press the move key, you need not necessarily point at the
+selected object.  The distance you travel while holding the key down is what
+determines the move of the object; this distance is called the translation vector.
+
+There are ways to select several object at the same time.  Thereafter we can move
+all of them by the same translation vector.  So let us learn more about selecting
+objects:
+So far, we have merely pointed at an object and then clicked the select key.  If,
+however, the cursor is moved while the key is held, all objects are selected that
+lie entirely within the rectangle whose diagonal is the vector that the cursor
+travelled.  We call this operation the selection of an area.  Try this now!
+
+You should have noticed that upon selection all previously selected objects were
+deselected.  This can be prevented by pressing not only the select key, but also
+the move key (even by only clicking it).  This is another way of making several
+objects selected. 
+
+The second important operation that can be performed on (groups of) objects is
+copying them.  Select a number of objects, then move them and, while moving the
+cursor and holding the move key, also click the draw key.  The objects, instead
+of being moved, will be copied.  The place of the copies is determined, as in the
+case of moving, by the translation vector travelled by the cursor.
+
+The third fundamental operation is the deletion of objects.  Select an object,
+then hit the DEL or the ESC key of the keyboard.  It will erase all selected
+objects.  But be careful, there is no way to retrieve them!
+C Y15
+14.2.3.  Other Commands 
++
+Now we have learned the most common, most important, and most frequently used
+operations performed with SIL.  But there are a few more offerings!  Press the draw
+and the select keys (middle and left key) and keep them down.  A so-called menu will
+appear at the place of the cursor.  It contains the following selection of commands:
+c
+mac0, mac1, font, width, grid, menu.
++
+One of these commands is white on black, or 1inverted0; this signifies that it
+is selected.  Now move the mouse in the vertical direction until the command mac0
+is inverted.  Then release the keys.  The imperative 7type code!0 appears on the
+screen, asking you to type a so-called macro code character which will determine
+the symbol to be drawn.  Type A: the symbol for a NAND gate is drawn, because A
+is its code character.  (Note: no macros are available, unless you selected the c
+profile initially.)
+
+There are two macro libraries, selected by the commands mac1 and mac2.  Their
+contents and code characters are specified in the 1Dictionnary of SIL Macros.0
+The drawn macro symbols are covered by a dot pattern.  This means that the macro
+is selected.  Try to move or copy it.  Deselect it by moving the cursor to an empty
+space and clicking the select key.
+
+And now to the other commands on the menu!  Press again the draw and the select
+keys (i.e. get the menu).  Then select the width command and release one of the
+held keys.  Now another menu appears which offers four different line widths, namely
+1, 2, 3 and 4.  The one currently selected is again shown white on black.  Move the
+mouse up or down and select 2.  Then release the key.  If you now draw a line, it
+will have the width 2.
+
+You may have noticed that the cursor does not move smoothly on the screen, but
+rather jumps on a small, invisible grid.  This is intentional to make exact
+positioning more easily possible.  The width of this grid can also be changed.
+Get the menu, select the grid command, release one key: the new menu shows you
+the current grid width, and allows you to select one among the values 1, 2, 4, and 8. 
+
+The font command operates similarly and lets you choose among four fonts.  The
+one selected determines the style of text typed in.  There are three text fonts;
+the fourth is used for drawing special symbols and is described on a subsequent
+page.  The fonts are selected at the start of the session according to specifications
+on your User Profile.  In the standard profiles they are
+- x50 t 150 250. y4
+   1normal profile  c profile6
+0  HELVETICA12  HELVETICA12
+1  HELVETICA16  HELVETICA8
+2  HELVETICA20  HELVETICA8I
+3  SYMBOL32     SYMBOL32
++
+Hint for circuit diagram designers: use HELVETICA12 for titles and captions,
+HELVETICA8I for part numbers, connector designations, and comments.
+
+Now try to draw lines of different widths and text in different fonts using
+different grid spacings.  If you are satisfied, return to the default values
+(width = 1, grid = 4, font = HELVETICA12).
+
+There exist a few more commands; they are needed relatively rarely but are
+nevertheless indispensible.  Get the menu, select the command "menu" and release
+one of the keys.  The alternate menu appears with the commands
+c
+ticks, delete, get*, get, put, exit.
++
+A command is selected, as usual, by moving the mouse such that the appropriate
+menu field is inverted, and then releasing the key.  The command 1ticks0 displays
+a grid of dots (ticks) over the entire picture area.  The grid helps you in
+designing diagrams by providing reference points.  The grid spacing is 16.
+Selecting the ticks command again will make the grid disappear.  Hence, this
+command acts as an on/off toggle switch.
+
+The delete command is equivalent with the DEL or ESC keys on the keyboard: it deletes
+the selected objects.
+
+The exit command requires a confirmation.  Be sure you have written your drawing
+on a file (see below) before quitting.  Confirmation by typing "y" (for yes)
+terminates your SIL session.  Confirmation with "r" clears the screen and resets
+SIL such that you may start a new drawing.
+
+The actual picture area corresponds to an A4-page.  In order to see the upper part
+of the page, type CTRL-j.  Switch back to the lower part by typing CTRL-k.  The
+picture area is 640 dots wide and 832 dots high.
+C Y15
+14.2.4.  Input and Output of Diagrams 
++
+The get command allows to input a SIL picture that was previously saved by a put
+command on a disk file.  Select the get command; SIL writes the message 7file:0 on
+the screen, asking you to input the desired file name.  In typing the name, you
+may use the DEL key to correct typing errors.  Terminate the name with RETURN.
+ If the given name ends with a period, SIL will automatically append the name
+extension SIL ; then confirm with blank.  ESC will cancel the command.
+
+1The get* command is used to read files generated by previous versions of the
+SIL system.  These files use a different origin coordinate.  The command will be
+deleted in future SIL versions.0
+
+Now type "Summary.", the name of a summary file loaded with the SIL system.
+ Use it to exercise the commands learned above.  When drawing circuit diagrams,
+start out by reading the file 1form,0 in order to see the maximum area of a page,
+read the file 1frame.0
+
+The put command is prompted with the message 7file:0 followed by the name of
+the last read input file. A new name can now be entered; merely typing RETURN
+will retain the old file name, i.e.  replace the old file by the new picture. 
+C Y15
+14.2.5.  Hardcopy 
++
+A hardcopy of a SIL-page is obtained by inserting your disk on the printer server
+and calling the program 1silprint0.  Then type the file name
+(when ending with a period, the program automatically appends the default extension
+SIL).  Then type a single digit to indicate the number of copies desired.  Printing
+is terminated by answering the next file name request with an ESC.  (Be sure to
+record the indicated number of pages printed in the note book!)
+C Y15
+14.2.6.  Program SilCheck
++
+In SIL documents, it is
+impossible to see whether or not several elements are either
+overlapping or even fully covering others.  It is highly desirable to avoid
+overlapping elements, because they do not contribute to the picture but only add
+to the length of the SIL file.  Also, if a line is drawn by adjoining pieces
+instead of in a single piece, it makes life hard for analyzing programs such
+as e.g. a wirelist generator.  The program 1SilCheck0 detects and indicates such
+overlaps.  With its aids, redundant elements can then be eliminated with SIL
+according to the following recipe.
+
+Call SilCheck and generate a so-called checkfile for each document to be inspected.
+ SilCheck repeatedly requests
+an input file name (default extension SIL) and an output file name (default
+extension CK.SIL).  After generating the check files, call SIL, first reading
+the file  xxx.CK.SIL.  SIL now shows all instances of overlapping items
+detected.  Now get the original file  xxx.SIL  and start deleting the overlapping
+lines and those supplied by the check file.  Note that you may have to regenerate
+the picture quite often to see the remaining elements buried under the deleted ones.
+Use CTRL-j and CTRL-k for this purpose.  After all redundant elements had been deleted,
+write the output file.  Then check it again using SilCheck.
+
+SilCheck detects three cases of overlapping elements: horizontal lines of height 1,
+vertical lines of width 1, and texts.  It indicates the overlapping elements
+by a line of width 2 (underlining in the case of text).  Adjacent lines are
+also indicated, even if they do not overlap.
+p
+    
+p
+    

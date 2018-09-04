@@ -1,0 +1,2040 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          DiskSystem:                 *
+*                                      *
+*          Implementation of files     *
+*          on the Honeywell Bull 140   *
+*          disks drives.               *
+*          Privat for MEDOS and        *
+*          some utility programs.      *
+*                                      *
+*          Version 4  14.06.82         *
+*          Version 42 30.11.82         *
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+IMPLEMENTATION MODULE DiskSystem;
+
+  IMPORT Terminal;
+  IMPORT CardinalIO;
+
+  IMPORT FileSystem;
+  FROM FileSystem IMPORT
+    File, Command, Response,
+    CreateMedium, RemoveMedium;
+
+  IMPORT D140Disk;
+
+  IMPORT Monitor;
+
+  IMPORT SYSTEM;
+
+
+  CONST
+    mediumtype   = 'DK';
+    mediumno     = 177777B;
+    drive        = 0;
+
+  MODULE VirtualDisk;
+
+    FROM Terminal IMPORT WriteString, WriteLn;
+    FROM CardinalIO IMPORT WriteOct;
+
+    FROM SYSTEM IMPORT
+      WORD, ADR, TSIZE;
+
+    FROM D140Disk IMPORT
+      DiskReset, DiskStatus, DiskRead, DiskWrite;
+
+    FROM FileSystem IMPORT 
+      File, Command, Response, 
+      Flag, FlagSet,
+      MediumType; 
+
+    FROM Monitor IMPORT
+      CurrentLevel, SharedLevel,
+      TermProcedure,
+      Time, GetTime;
+
+    IMPORT
+      FileDesc, FDKind, 
+      FileNumber,
+      nofile, father, son,        (** PDP 11 only **) 
+      Position, Minute, 
+      Page,  
+      maxfiller, 
+      modifyprot,
+      sons, 
+      pagetablength,
+      drive; 
+
+    EXPORT 
+      universalversion, 
+
+      dirfileno, backdirfileno, 
+      namefileno, backnamefileno,   
+      badfileno, 
+      bootfileno, backbootfileno, 
+      dumpfileno, dump1fileno, 
+ 
+      files,
+
+      InitVol, OpenVol, CloseVol, 
+      FreePages, 
+      FileCommand,
+      ReadFileDesc, WriteFileDesc; 
+      
+    CONST
+      maxfilelength    = 768;  (* in sectors *)
+      cardnil          = 177777B;
+      universalversion = 177777B;
+
+      fixedfiles       = 9;  (* number of preallocated files *)
+      dirfileno        = 0;  (* file numbers of filedirectoryfiles. *)
+      backdirfileno    = 1; 
+      namefileno       = 2;  (* file numbers of namedirectoryfiles. *)
+      backnamefileno   = 3; 
+      badfileno        = 4;  (* file number of file with bad sectors. *)
+      bootfileno       = 5;  (* file numbers of boot code files. *)
+      backbootfileno   = 6; 
+      dumpfileno       = 7;  (* file numbers of dumpfiles. *)
+      dump1fileno      = 8; 
+   
+      dirfilebase      = 2256;      dirfilelength  =  768; (* sectors *)
+      backdirfilebase  = 4596;
+      namefilebase     = 2352;      namefilelength =   96;
+      backnamefilebase = 4692;
+      bootfilebase     =    0;      bootfilelength =  192;
+      backbootfilebase =  156;
+      dumpfilebase     =   24;      dumpfilelength =  512;
+      dump1filebase    =   88;
+     
+      pagesize       =     8; 
+      pages          =  4704;  (* sectors on the pack DIV pagesize *)
+      pagecheck      =    13;  (* pagenumbers are multiplyed by pagecheck *) 
+      pagenil        = pages * pagecheck;
+      pagemaplength  = (pages + 11) DIV 12;
+
+      files          =   768;
+      filemaplength  = (files + 15) DIV 16;
+
+      vdks           =    16;  (* maximal number of opened files *)
+      bufs           =  vdks;  (* number of buffers; bufs >= vdks *)
+ 
+      ptablength     =    12;
+      datalength     =   128;
+      sectorsize     =   256;  (* size of a sector in bytes *)
+      secinblock     =   256;  (* 2**16 DIV sectorsize *)
+      
+ 
+    TYPE
+      BufPtr = POINTER TO BufDesc; 
+      VDkPtr = POINTER TO VDkDesc;
+
+      ShortSet = CARDINAL;  
+ 
+      VolumeDesc =  RECORD
+                      on: BOOLEAN;
+                      pm: ARRAY [0..pagemaplength-1] OF ShortSet;
+                      fm: ARRAY [0..filemaplength-1] OF BITSET; 
+                      df: File;         (* directory file *)
+                      vdklist: VDkPtr;  (* list of opened vdk's *)
+                    END; 
+
+      VDkState = (opened, reading, modifying, writing);
+      VDkDesc = RECORD 
+                  nextvdk: VDkPtr; 
+                  level: CARDINAL;      (* declaration level *) 
+                  fno: FileNumber; 
+                  vno: CARDINAL; 
+                  lgth: Position; 
+                  lmod: BOOLEAN;        (* lgth changed *) 
+                  perm: BOOLEAN; 
+                  prot: BOOLEAN; 
+                  modifyed: BOOLEAN;    (* TRUE after first modification *)
+                  pos: Position;        (* current position of file *) 
+                  state: VDkState; 
+                  resp: Response;
+                  curbuf: BufPtr;       (* current buffer *)
+                  ptabbase: CARDINAL;   (* base of local part of ptab *) 
+                  ptabmod: BOOLEAN;     (* ptab changed *) 
+                  ptab: ARRAY [0..ptablength-1] OF Page;
+                  lastsector: CARDINAL; (* last sector accessed *)
+                  lastaccesses: BITSET;
+                  (* gives last 16 accesses:
+                     bit cleared <--> sequential access
+                     bit set <--> nonsequential access *)
+                  nextbit: CARDINAL;    (* next bit to be replaced *)
+                  nonseqaccesses: CARDINAL;
+                  (* number of bits set in lastaccesses *)
+                  isnonsequential: BOOLEAN;
+                  (* file is not used sequentially *)
+                END; 
+ 
+      DataArea = ARRAY [0..datalength-1] OF WORD;
+      BufDesc = RECORD
+                  nextbuf: BufPtr;
+                  clock: CARDINAL;
+                  vp: VDkPtr;
+                  sec: CARDINAL;
+                  p: Page;
+                  res: Response;
+                  data: DataArea;
+                END;
+
+      FDPtr = POINTER TO FileDesc;
+
+
+    VAR filesactive: CARDINAL;
+        (* number of files in state reading, modifying or writing *)
+        filesusingone: CARDINAL;
+        (* number of files using always only one buffer (no read ahead):
+            - all files in state writing
+            - the file and name directory files in any state except state opened *)
+        nonsequentialfiles: CARDINAL;
+        (* number of files not used sequentially *)
+
+    VAR vd: VolumeDesc;
+
+
+    PROCEDURE InitVolume;
+      VAR c: CARDINAL;
+    BEGIN
+      WITH vd DO
+        vdklist := NIL;
+        FOR c := 0 TO pagemaplength-1 DO pm[c] := emptyss END;
+        FOR c := 0 TO pages-1 DO
+          IF FixedPage(c * pagecheck) THEN SetPage(c * pagecheck) END;
+        END;
+        FOR c := 0 TO filemaplength-1 DO fm[c] := {} END;
+        on := FALSE;
+      END;
+    END InitVolume;
+
+
+    CONST
+      bitsinss = 12;
+      setcheck = 13;
+      emptyss  = 7777B * setcheck;
+      fullss   = 0;
+
+    PROCEDURE ShortSetToBITSET(ss: ShortSet): BITSET;
+    BEGIN
+      IF ss MOD 13 <> 0 THEN
+        WriteString("- DiskSystem.ShortSetToBITSET: ");
+        WriteString("bad bitmap entry found"); WriteLn;
+        HALT
+      END;
+      ss := ss DIV setcheck;
+      IF TSIZE(WORD) = 1 THEN ss := ss * 16 END;
+      RETURN BITSET(ss);
+    END ShortSetToBITSET;
+
+    PROCEDURE BITSETToShortSet(bs: BITSET): ShortSet;
+      VAR ss: ShortSet;
+    BEGIN
+      ss := ShortSet(bs);
+      IF TSIZE(WORD) = 1 THEN ss := ss DIV 16 END;
+      RETURN ss * 13
+    END BITSETToShortSet;
+
+    PROCEDURE INCLSS(VAR ss: ShortSet; b: CARDINAL);
+      VAR bs: BITSET;
+    BEGIN
+      bs := ShortSetToBITSET(ss);
+      EXCL(bs, b);
+      ss := BITSETToShortSet(bs);
+    END INCLSS;
+
+    PROCEDURE EXCLSS(VAR ss: ShortSet; b: CARDINAL);
+      VAR bs: BITSET;
+    BEGIN
+      bs := ShortSetToBITSET(ss);
+      INCL(bs, b);
+      ss := BITSETToShortSet(bs);
+    END EXCLSS;
+
+    PROCEDURE INSS(ss: ShortSet; b: CARDINAL): BOOLEAN;
+    BEGIN
+      RETURN NOT ( b IN ShortSetToBITSET(ss));
+    END INSS;
+
+
+    PROCEDURE SetPage(p: Page);
+    BEGIN 
+      IF p MOD pagecheck = 0 THEN 
+        p := p DIV pagecheck;
+        INCLSS(vd.pm[p DIV bitsinss], p MOD bitsinss) 
+      END 
+    END SetPage; 
+
+
+    PROCEDURE TestPage(p: Page): BOOLEAN; 
+    BEGIN 
+      IF p MOD pagecheck = 0 THEN 
+        p := p DIV pagecheck; 
+        RETURN INSS(vd.pm[p DIV bitsinss], p MOD bitsinss); 
+      ELSE RETURN FALSE 
+      END 
+    END TestPage; 
+
+
+    PROCEDURE AllocPage(VAR p: Page; where: Page); 
+
+      VAR
+        lc, hc: CARDINAL;
+        low: BOOLEAN;
+        c: CARDINAL;
+
+    BEGIN
+      WITH vd DO
+        where := where DIV pagecheck;
+        IF where >= pages THEN where := pages DIV 2 END;
+        p := where DIV bitsinss;
+        lc := p; hc := p; low := TRUE;
+        WHILE (p <> pagenil) AND (pm[p] = fullss) DO
+          IF (lc = 0) AND (hc = pagemaplength-1) THEN p := pagenil
+          ELSIF low THEN
+            IF hc < pagemaplength-1 THEN INC(hc); p := hc END
+          ELSIF lc > 0 THEN DEC(lc); p := lc
+          END;
+          low := NOT low
+        END;
+        IF p <> pagenil THEN c := 0;
+          WHILE INSS(pm[p], c) DO INC(c) END; 
+          INCLSS(pm[p], c); 
+          p := (p * bitsinss + c) * pagecheck
+        END; 
+      END;
+    END AllocPage; 
+
+
+    PROCEDURE DeallocPage(VAR p: Page); 
+    BEGIN 
+      IF p MOD pagecheck = 0 THEN
+        IF p < pagenil THEN 
+          p := p DIV pagecheck; 
+          EXCLSS(vd.pm[p DIV bitsinss], p MOD bitsinss)
+        END;  
+      END; 
+      p := pagenil;
+    END DeallocPage; 
+
+
+    PROCEDURE FreePages(): CARDINAL;
+
+      VAR
+        p, t, n: CARDINAL;
+        b: BITSET;
+    
+    BEGIN
+      n := 0;
+      WITH vd DO
+        IF on THEN
+          FOR t := 0 TO pagemaplength-1 DO
+            b := ShortSetToBITSET(pm[t]);
+            FOR p := 0 TO bitsinss-1 DO
+              IF p IN b THEN INC(n) END
+            END
+          END
+        END
+      END;
+      RETURN n
+    END FreePages;
+
+
+    PROCEDURE FixedPage(p: Page): BOOLEAN;
+    BEGIN
+      p := p DIV pagecheck;
+      RETURN (p < 180) OR
+             (2256 <= p) AND (p < 2364) OR
+             (4596 <= p);
+    END FixedPage;
+
+
+    PROCEDURE SetFile(fno: FileNumber); 
+    BEGIN 
+      INCL(vd.fm[fno DIV 16], fno MOD 16)
+    END SetFile; 
+
+     
+    PROCEDURE AllocFile(VAR fno: CARDINAL); 
+      VAR i,j: CARDINAL; bs: BITSET;
+    BEGIN 
+      WITH vd DO 
+        i := 0; 
+        LOOP 
+          IF i > filemaplength-1 THEN fno := cardnil; EXIT
+          ELSE
+            bs := fm[i];
+            IF bs = {0..15} THEN INC(i) 
+            ELSE j := 0;
+              WHILE j IN bs DO INC(j) END; 
+              INCL(fm[i], j);
+              fno := i * 16 + j;
+              EXIT
+            END; 
+          END; 
+        END; 
+      END 
+    END AllocFile; 
+ 
+
+    PROCEDURE DeallocFile(fno: FileNumber); 
+    BEGIN 
+      IF fno < files THEN 
+        EXCL(vd.fm[fno DIV 16], fno MOD 16) 
+      END 
+    END DeallocFile; 
+
+     
+    MODULE VDkAllocator[15];
+
+      IMPORT
+        VDkPtr, VDkDesc, VDkState, Response, vdks, vd,
+        ADR, SharedLevel, cardnil;
+
+      EXPORT AllocVDk, DeallocVDk;
+
+      VAR
+        freevdk: VDkPtr;
+        vdktab: ARRAY [1..vdks] OF VDkDesc;        
+        i: CARDINAL;
+
+      PROCEDURE AllocVDk(VAR p: VDkPtr);
+      BEGIN   
+        IF vd.on THEN
+          p := freevdk; 
+          IF p <> NIL THEN 
+            WITH p^ DO 
+              fno := cardnil;
+              freevdk := nextvdk; 
+              level := SharedLevel();
+              WITH lgth DO block := 0; byte := 0 END; 
+              lmod := FALSE; perm := FALSE;  
+              prot := FALSE; modifyed := FALSE; 
+              pos := lgth; 
+              state := opened; resp := done; 
+              curbuf := NIL; 
+              ptabbase := cardnil; ptabmod := FALSE;
+              lastsector := 0;
+              lastaccesses := BITSET{1,2,6,10,14}; nextbit := 0;
+              nonseqaccesses := 5; isnonsequential := FALSE;
+              WITH vd DO nextvdk := vdklist; vdklist := p END;
+            END; 
+          END; 
+        ELSE p := NIL
+        END;
+      END AllocVDk; 
+ 
+ 
+      PROCEDURE DeallocVDk(VAR p: VDkPtr);
+        VAR p1: VDkPtr; 
+      BEGIN 
+        WITH p^ DO
+          WITH vd DO 
+            IF vdklist = p THEN vdklist := nextvdk 
+            ELSE p1 := vdklist; 
+              WHILE p1^.nextvdk<>p DO p1 := p1^.nextvdk END;
+              p1^.nextvdk := nextvdk; 
+            END; 
+          END; 
+          nextvdk := freevdk; freevdk := p; p := NIL;
+        END; 
+      END DeallocVDk; 
+
+    BEGIN
+      freevdk := NIL; 
+      FOR i := 1 TO vdks DO
+        vdktab[i].nextvdk := freevdk; 
+        freevdk := VDkPtr(ADR(vdktab[i])) 
+      END; 
+    END VDkAllocator;
+ 
+
+    PROCEDURE FixPagetabs(vdkp: VDkPtr; sector: CARDINAL);
+
+      VAR
+        fdp: FDPtr; 
+        c, ptb: CARDINAL;
+        newptab: BOOLEAN;
+
+    BEGIN 
+      WITH vdkp^ DO   
+        ptb := sector DIV pagesize DIV ptablength * ptablength;
+        newptab := (lgth.byte = 0) AND (lgth.block = ptb * pagesize);
+        IF lmod OR ptabmod OR NOT newptab AND (ptabbase <> ptb) THEN
+          IF lmod OR ptabmod THEN Setdf(fno, setmodify)
+          ELSE Setdf(fno, setread)
+          END;
+          WITH vd DO
+            WITH df DO
+              IF res = done THEN fdp := ela;
+                WITH fdp^ DO
+                  length := lgth; lmod := FALSE;
+                  IF ptabmod THEN
+                    CopyToPagetab(fdp^, vdkp^);
+                  END;
+                  IF NOT newptab THEN
+                    ptabbase := ptb;
+                    CopyFromPagetab(fdp^, vdkp^);
+                  END;
+                END;
+                ela := topa;
+              END;
+              FC(df, setopen);
+              IF resp = done THEN resp := res END;
+            END;
+          END;
+        END;
+        IF newptab THEN
+          ptabbase := ptb;
+          FOR c := 0 TO ptablength-1 DO ptab[c] := pagenil END;
+        END;
+        ptabmod := FALSE;
+      END;
+    END FixPagetabs;
+ 
+
+    PROCEDURE FindPage(vdkp: VDkPtr; sector: CARDINAL;
+                       VAR p: Page; VAR res: Response);
+
+      VAR pno, pix, ptb: CARDINAL;
+
+    BEGIN
+      WITH vdkp^ DO
+        p := pagenil; res := done;
+        IF (lgth.byte > 0) OR (sector <> lgth.block) THEN
+          IF sector >= maxfilelength THEN
+            res := eom;
+          ELSE pno := sector DIV pagesize;
+            IF fno = dirfileno THEN
+              p := pagecheck * (dirfilebase + pno); 
+            ELSE ptb := pno DIV ptablength * ptablength;
+              pix := pno - ptb;
+              IF ptabbase <> ptb THEN FixPagetabs(vdkp, sector) END;
+              IF ptabbase = ptb THEN
+                p := ptab[pix];
+                IF p >= pagenil THEN
+                  IF pix = 0 THEN AllocPage(p, pagenil)
+                  ELSE AllocPage(p, ptab[pix-1])
+                  END;
+                  ptab[pix] := p; ptabmod := TRUE;
+                  IF p>= pagenil THEN res := eom END;
+                END;
+              ELSE res := softerror
+              END;
+            END;
+          END;
+        END;
+      END;
+    END FindPage;
+
+
+    MODULE BufferManager;
+
+      IMPORT
+        VDkDesc, VDkPtr, VDkState,
+        BufDesc, BufPtr, bufs, ADR,
+        Response, Page,
+        cardnil, pagenil, FindPage,
+        pagecheck, pagesize, FixedPage,
+        fixedfiles, dirfileno, backnamefileno,
+        filesactive, filesusingone, nonsequentialfiles,
+        DiskRead, DiskWrite, drive,
+        WriteString, WriteOct, WriteLn;
+
+      EXPORT SetReadAhead, PutBuf, GetBuf, ClearBufs, ReturnCancelled;
+
+
+      VAR maxreadahead: CARDINAL;
+          (* maximum number of sectors read ahead *)
+          maxnonseqlength: CARDINAL;
+          (* maximum read ahead for a file to be taken as nonsequential *)
+
+      PROCEDURE SetReadAhead;
+      BEGIN
+        (* maxreadahead = 2 * (buffers used for nonwriting files + 1) /
+                          (nonwritingfiles + 1) - 1, rounded to higher
+                        = (2 * (buffers used for nonwriting files) + 1) DIV
+                          (nonwritingfiles + 1)
+        *)
+        maxreadahead := (2 * (bufs - filesusingone) + 1) DIV
+                        (filesactive - filesusingone + 1);
+        maxnonseqlength := (maxreadahead + 1) DIV 3;
+      END SetReadAhead;
+
+
+      MODULE BufferAllocator[15];
+
+        IMPORT
+          VDkDesc, VDkPtr, BufDesc, BufPtr,
+          bufs, cardnil, pagenil, Response, ADR,
+          dirfileno, maxreadahead;
+
+        EXPORT AllocBuf, DeallocBuf, ReturnBufs;
+
+        VAR
+          buftab: ARRAY [1..bufs] OF BufDesc;
+          last: BufPtr; (* most recently used buffer;
+                           last^.nextbuf gives least recently used *)
+          i: CARDINAL;
+
+        PROCEDURE AllocBuf(vdkp: VDkPtr; sector: CARDINAL;
+                           optional: BOOLEAN);
+          (* sector found <--> vdkp^.curbuf^.p < pagenil *)
+
+          VAR
+            this, previous: BufPtr;
+            found, freefound: BOOLEAN;
+
+        BEGIN (* bufs >= vdks --> (last <> NIL) OR optional *)
+          this := last; found := FALSE; freefound := FALSE;
+          IF this <> NIL THEN
+            IF vdkp^.fno <> dirfileno THEN
+              LOOP
+                previous := this; this := previous^.nextbuf;
+                WITH this^ DO
+                  IF (sec = sector) AND (vp = vdkp) THEN
+                    found := TRUE;
+                    EXIT; (* sector found *)
+                  END;
+                  IF clock = 0 THEN freefound := TRUE END;
+                END;
+                IF this = last THEN 
+                  EXIT; (* sector not found *)
+                END;
+              END; (* LOOP *)
+            END;
+            IF NOT found THEN (* sector not found --> this = last *)
+              (* vdkp^.fno = dirfileno --> NOT optional *)
+              IF NOT optional OR freefound THEN
+                LOOP
+                  previous := this; this := previous^.nextbuf;
+                  WITH this^ DO
+                    IF clock = 0 THEN
+                      vp := vdkp; sec := sector;
+                      p := pagenil; res := notdone;
+                      IF NOT optional THEN last := previous END;
+                      EXIT;
+                    END;
+                    IF NOT optional THEN DEC(clock) END;
+                  END;
+                END; (* LOOP *)
+              ELSE (* optional AND NOT freefound *)
+                this := NIL;
+              END;
+            END;
+            IF this <> NIL THEN
+              previous^.nextbuf := this^.nextbuf;
+              IF this = previous THEN last := NIL END;
+              IF this = last THEN last := previous END;
+            END;
+          END;
+          vdkp^.curbuf := this;
+        END AllocBuf; 
+   
+        PROCEDURE DeallocBuf(vdkp: VDkPtr; clk: CARDINAL); 
+        BEGIN
+          WITH vdkp^ DO
+            IF curbuf <> NIL THEN
+              WITH curbuf^ DO
+                IF last <> NIL THEN
+                  nextbuf := last^.nextbuf; last^.nextbuf := curbuf;
+                ELSE nextbuf := curbuf;
+                END;
+                clock := clk;
+                IF (fno = dirfileno) OR (res <> done) OR (p >= pagenil) THEN
+                  vp := NIL; sec := cardnil; clock := 0;
+                END;
+              END;
+              last := curbuf; curbuf := NIL;
+            END;
+          END;  
+        END DeallocBuf;
+
+        PROCEDURE ReturnBufs(vdkp: VDkPtr; sector: CARDINAL);
+          VAR this: BufPtr;
+        BEGIN
+          IF (vdkp^.fno <> dirfileno) AND (last <> NIL) THEN
+            this := last;
+            REPEAT
+              WITH this^ DO
+                IF (vp = vdkp) AND (sec >= sector) THEN
+                  vp := NIL; sec := cardnil; clock := 0;
+                END;
+                this := nextbuf;
+              END;
+            UNTIL this = last;
+          END;
+        END ReturnBufs;
+
+      BEGIN
+        last := ADR(buftab[bufs]);
+        FOR i := 1 TO bufs DO
+          WITH buftab[i] DO
+            nextbuf := last;
+            vp := NIL; sec := cardnil; clock := 0;
+          END;
+          last := ADR(buftab[i])
+        END;
+      END BufferAllocator;
+
+
+      PROCEDURE PutBuf(vdkp: VDkPtr); 
+      BEGIN
+        WITH vdkp^ DO
+          IF curbuf <> NIL THEN
+            WITH curbuf^ DO
+              IF (res = done) AND (state <> reading) THEN
+                IF p >= pagenil THEN FindPage(vdkp, sec, p, res) END;
+                IF p < pagenil THEN
+                  IF p MOD pagecheck = 0 THEN
+                    IF FixedPage(p) = (fno < fixedfiles) THEN
+                      DiskWrite(drive, p DIV pagecheck * pagesize + 
+                                sec MOD pagesize, data, res);
+                    ELSE
+                      WriteString('- DiskSystem.PutBuf: ');
+                      WriteString('bad page: pageno = '); WriteOct(p);
+                      WriteString(' fno = '); WriteOct(fno);
+                      WriteLn;
+                      res := softerror;
+                    END;
+                  ELSE res := softparityerror;
+                  END;
+                END;
+                IF resp = done THEN resp := res END;
+              END;
+              lastsector := sec;
+            END;
+            IF isnonsequential THEN
+              DeallocBuf(vdkp, nonsequentialfiles DIV 2 + 1);
+            ELSE DeallocBuf(vdkp, 0);
+            END;
+          END;
+        END;
+      END PutBuf;
+
+  
+      PROCEDURE GetBuf(vdkp: VDkPtr); 
+
+        VAR
+          r: Response;
+          lp: Page;
+          firstsec, secinpage, sequencelength, readahead: CARDINAL;
+
+      BEGIN
+        WITH vdkp^ DO
+          IF (curbuf <> NIL) AND (curbuf^.sec <> pos.block) THEN
+            PutBuf(vdkp)
+          END;
+          IF curbuf = NIL THEN
+            IF pos.block <> lastsector THEN
+              IF nextbit IN lastaccesses THEN (* clear bit *)
+                DEC(nonseqaccesses);
+                EXCL(lastaccesses, nextbit);
+              END;
+              IF pos.block <> lastsector + 1 THEN (* set bit *)
+                INC(nonseqaccesses);
+                INCL(lastaccesses, nextbit);
+              END;
+              nextbit := (nextbit + 1) MOD 16;
+            END;
+            AllocBuf(vdkp, pos.block, FALSE);
+            IF curbuf^.p >= pagenil THEN (* sector not found *)
+              FindPage(vdkp, pos.block, lp, r);
+              IF isnonsequential THEN
+                DEC(nonsequentialfiles); isnonsequential := FALSE;
+              END;
+              IF lp < pagenil THEN
+                sequencelength := 1;
+                IF (fno > backnamefileno) AND (state <> writing) THEN
+                  sequencelength := 24 DIV (nonseqaccesses + 1);
+                  (*     nonseqaccesses <=  2: sequencelength >= 8 ( = pagesize)
+                     2 < nonseqaccesses <= 11: sequencelength = 16 / nonseqaccesses,
+                                               rounded to higher
+                         nonseqaccesses >  11: sequencelength = 1
+                  *)
+                  IF sequencelength <= maxnonseqlength THEN
+                    INC(nonsequentialfiles); isnonsequential := TRUE;
+                  END;
+                  IF sequencelength > maxreadahead THEN
+                    sequencelength := maxreadahead;
+                  END;
+                END;
+                WITH curbuf^ DO
+                  IF lp MOD pagecheck <> 0 THEN
+                    r := softparityerror
+                  ELSE
+                    firstsec := lp DIV pagecheck * pagesize;
+                    secinpage := sec MOD pagesize;
+                    DiskRead(drive, firstsec + secinpage, data, r);
+                  END;
+                  res := r; p := lp;
+                END;
+                IF sequencelength > pagesize - secinpage THEN
+                  sequencelength := pagesize - secinpage;
+                END;
+                IF (sequencelength > 1) AND (r = done) THEN (* read ahead *)
+                  readahead := 0;
+                  LOOP
+                    DeallocBuf(vdkp, filesactive + sequencelength);
+                    INC(readahead); INC(secinpage); DEC(sequencelength);
+                    IF (sequencelength = 0) OR
+                       (r <> done) OR
+                       (pos.block + readahead > lgth.block) THEN
+                      EXIT; (* stop reading ahead *)
+                    END;
+                    AllocBuf(vdkp, pos.block + readahead, TRUE);
+                    IF curbuf = NIL THEN
+                      EXIT; (* stop reading ahead *)
+                    END;
+                    WITH curbuf^ DO
+                      IF p < pagenil THEN (* sector found *)
+                        (* stop reading ahead, but first deallocate buffer *)
+                        sequencelength := 1; (* in order to exit loop *)
+                      ELSE
+                        DiskRead(drive, firstsec + secinpage, data, r);
+                        res := r; p := lp;
+                      END;
+                    END;
+                  END; (* LOOP *)
+                  AllocBuf(vdkp, pos.block, FALSE);
+                  WITH curbuf^ DO
+                    IF p >= pagenil THEN (* sector not found *)
+                      WriteString('- DiskSystem.GetBuf: ');
+                      WriteString('bad buffering while reading ahead');
+                      WriteLn;
+                      res := softerror;
+                    END;
+                  END;
+                END; (* read ahead *)
+              ELSE curbuf^.res := r
+              END;
+            END;
+            IF resp = done THEN resp := curbuf^.res END;
+          END;
+        END;
+      END GetBuf;
+
+      PROCEDURE ClearBufs(vdkp: VDkPtr);
+      BEGIN
+        PutBuf(vdkp); ReturnBufs(vdkp, 0);
+      END ClearBufs;
+
+      PROCEDURE ReturnCancelled(vdkp: VDkPtr);
+        VAR sector: CARDINAL;
+      BEGIN
+        WITH vdkp^ DO
+          sector := lgth.block;
+          IF lgth.byte > 0 THEN INC(sector) END;
+          IF (curbuf <> NIL) AND (curbuf^.sec >= sector) THEN
+            DeallocBuf(vdkp, 0)
+          END;
+          ReturnBufs(vdkp, sector);
+        END;
+      END ReturnCancelled;
+
+    END BufferManager;   
+ 
+     
+   PROCEDURE InitFile(VAR f: File); 
+    BEGIN 
+      WITH f DO
+        bufa := NIL; ela := NIL; ina := NIL; topa := NIL; 
+        elodd := FALSE; inodd := FALSE; 
+        flags := FlagSet{ef}; 
+        eof := TRUE; res := done;
+        submedium := NIL;
+      END   
+    END InitFile; 
+   
+     
+    PROCEDURE Setdf(fno: FileNumber; c: Command);
+      VAR fdp: FDPtr;
+    BEGIN 
+      WITH vd DO 
+        WITH df DO
+          IF (c = setread) OR (c = setwrite) OR (c = setmodify) THEN 
+            highpos := fno DIV secinblock;
+            lowpos := fno MOD secinblock * sectorsize;
+            FC(df, setpos);
+            IF res = done THEN FC(df, setread);
+              IF res = done THEN
+                fdp := ela;
+                IF fdp^.filno <> fno THEN
+                  res := softerror;
+                  WriteString('- DiskSystem.FileCommand: ');
+                  WriteString('bad directory entry:');
+                  WriteString(' fno = '); WriteOct(fno);
+                  WriteString(' read fno = '); WriteOct(fdp^.filno);
+                  WriteLn;
+                ELSIF c <> setread THEN FC(df, setmodify)
+                END;
+              END;
+            END;
+          ELSE FC(df, c)
+          END; 
+        END 
+      END 
+    END Setdf; 
+
+
+    PROCEDURE NeededPages(VAR p: Position): CARDINAL;
+      VAR c: CARDINAL; 
+    BEGIN 
+      c := p.block; 
+      IF p.byte > 0 THEN INC(c) END; 
+      RETURN (pagesize - 1 + c) DIV pagesize;
+    END NeededPages; 
+ 
+ 
+    PROCEDURE CopyToPagetab(VAR fd: FileDesc; VAR vdk: VDkDesc);
+      VAR c: CARDINAL;
+    BEGIN
+      IF vdk.ptabbase < pagetablength THEN
+        FOR c := 0 TO ptablength-1 DO
+          fd.pagetab[vdk.ptabbase+c] := vdk.ptab[c];
+        END;
+      END;
+    END CopyToPagetab;
+
+
+    PROCEDURE CopyFromPagetab(VAR fd: FileDesc; VAR vdk: VDkDesc);
+      VAR c: CARDINAL;
+    BEGIN
+      IF vdk.ptabbase < pagetablength THEN
+        FOR c := 0 TO ptablength-1 DO
+          vdk.ptab[c] := fd.pagetab[vdk.ptabbase+c];
+        END;
+      ELSE 
+        FOR c := 0 TO ptablength-1 DO vdk.ptab[c] := pagenil END;
+      END;
+    END CopyFromPagetab;
+
+
+    PROCEDURE SetModifyTime(VAR fdp: FDPtr);
+      VAR t: Time;
+    BEGIN
+      GetTime(t);
+      WITH fdp^ DO
+        mtime.day := t.day;
+        mtime.minute := t.minute;
+        IF modification = 177777B THEN
+          modification := 1
+        ELSE INC(modification)
+        END
+      END
+    END SetModifyTime;
+
+
+    PROCEDURE CutVDk(vdkp: VDkPtr);
+ 
+      VAR
+        fdp: FDPtr;
+        neededp, actualp: CARDINAL;
+        freepagetab: ARRAY [0 .. pagetablength-1] OF Page;
+        top, c: CARDINAL;
+
+    BEGIN 
+      WITH vdkp^ DO 
+        IF (fno >= fixedfiles) AND NOT PosEqLgth(vdkp^) THEN
+          neededp := NeededPages(pos); 
+          actualp := NeededPages(lgth); 
+          lgth := pos; lmod := TRUE; 
+          IF neededp < actualp THEN
+            WITH vd DO 
+              WITH df DO 
+                Setdf(fno, setmodify); 
+                IF res = done THEN 
+                  fdp := ela; 
+                  WITH fdp^ DO 
+                    CopyToPagetab(fdp^, vdkp^);
+                    length := lgth; lmod := FALSE;
+                    top := 0;
+                    WHILE actualp > neededp DO
+                      DEC(actualp);
+                      freepagetab[top] := pagetab[actualp]; 
+                      pagetab[actualp] := pagenil;
+                      INC(top); 
+                    END; 
+                    ptabbase := neededp DIV pagesize * pagesize; 
+                    CopyFromPagetab(fdp^, vdkp^);
+                    ptabmod := FALSE;
+                    IF NOT modifyed THEN SetModifyTime(fdp) END; 
+                  END; 
+                  ela := topa; 
+                  FC(df, setopen); 
+                END; 
+                IF resp = done THEN resp := res END; 
+              END;
+              IF resp = done THEN
+                modifyed := TRUE;
+                c := 0;
+                WHILE c < top DO
+                  DeallocPage(freepagetab[c]);
+                  INC(c);
+                END;
+              END;
+            END;
+          END;
+          ReturnCancelled(vdkp);
+        END;
+      END;
+    END CutVDk;
+
+
+    PROCEDURE SetOpenVDk(vdkp: VDkPtr);
+    BEGIN
+      WITH vdkp^ DO
+        IF state <> opened THEN
+          ClearBufs(vdkp);
+          IF fno <> dirfileno THEN FixPagetabs(vdkp, pos.block) END;
+          IF (fno <= backnamefileno) OR (state = writing) THEN
+            DEC(filesusingone);
+          END;
+          IF isnonsequential THEN
+            DEC(nonsequentialfiles); isnonsequential := FALSE;
+          END;
+          DEC(filesactive);
+          state := opened;
+          SetReadAhead;
+        END
+      END
+    END SetOpenVDk;
+
+
+    PROCEDURE CloseVDk(VAR vdkp: VDkPtr);
+      VAR fdp: FDPtr; i: CARDINAL;
+    BEGIN
+      SetOpenVDk(vdkp);
+      WITH vdkp^ DO
+        IF NOT perm AND (fno >= fixedfiles) THEN
+          prot := FALSE;
+          pos.block := 0; pos.byte := 0;
+          CutVDk(vdkp); 
+          Setdf(fno, setmodify); 
+          WITH vd DO 
+            WITH df DO
+              IF res = done THEN 
+                fdp := ela; 
+                fdp^.fdt := nofile; 
+                FOR i := 0 TO maxfiller DO fdp^.filler[i] := 0 END; 
+                ela := topa; 
+              END; 
+              FC(df, setopen); 
+            END; 
+          END; 
+          DeallocFile(fno);
+        END; 
+      END; 
+      DeallocVDk(vdkp); 
+    END CloseVDk;
+ 
+ 
+    PROCEDURE PosGtLgth(VAR vdk: VDkDesc): BOOLEAN; 
+    BEGIN 
+      WITH vdk DO 
+        RETURN (pos.block > lgth.block) OR 
+               (pos.block = lgth.block) AND (pos.byte > lgth.byte) 
+      END 
+    END PosGtLgth; 
+ 
+ 
+    PROCEDURE PosEqLgth(VAR vdk: VDkDesc): BOOLEAN;
+    BEGIN
+      WITH vdk DO
+        RETURN (pos.block = lgth.block) AND (pos.byte = lgth.byte)
+      END
+    END PosEqLgth;
+         
+ 
+    PROCEDURE FileCommand(VAR f: File);
+
+      CONST 
+        bytesinword = 2;  
+ 
+      VAR
+        vdkp, p: VDkPtr; 
+        changed: BOOLEAN;
+        fdp: FDPtr;
+        oldres: Response;
+        oldpos: Position;
+ 
+
+      PROCEDURE CreateFile(VAR f: File);
+
+        VAR
+          vdkp: VDkPtr;
+          fdp: FDPtr;
+          t: Time;
+          i: CARDINAL;
+
+      BEGIN 
+        WITH f DO  
+          vdkp := submedium; 
+          WITH vdkp^ DO 
+            LOOP 
+              res := done;
+              AllocFile(fno);
+              IF fno >= files THEN res := toomanyfiles; EXIT END; 
+              Setdf(fno, setmodify); 
+              WITH vd DO 
+                WITH df DO 
+                  IF res <> done THEN f.res := res
+                  ELSE fdp := ela;  
+                    WITH fdp^ DO 
+                      IF fdt <> nofile THEN f.res := notdone;
+                      ELSE
+                        versno := versno MOD 77777B + 1; vno := versno; 
+                        fdt := father; 
+                        length.block := 0; length.byte := 0;
+                        GetTime(t);
+                        ctime.day := t.day;
+                        ctime.minute := t.minute;
+                        mtime := ctime;
+                        modification := 0; 
+                        referenced := 0; 
+                        protection := 0; 
+                        FOR i := 0 TO 3 DO fres[i] := 0 END; 
+                        FOR i := 1 TO sons-1 DO sontab[i] := cardnil END; 
+                        FOR i := 0 TO pagetablength-1 DO pagetab[i] := pagenil END; 
+                        ptabbase := 0;
+                        CopyFromPagetab(fdp^, vdkp^);
+                      END; 
+                    END;
+                    ela := topa;
+                  END;
+                  FC(df, setopen); 
+                  IF f.res = done THEN f.res := res END;
+                END; (* WITH df *)
+              END;
+              IF res = done THEN modifyed := TRUE; EXIT END;
+            END; (* LOOP *) 
+          END;
+        END; 
+      END CreateFile; 
+ 
+ 
+      PROCEDURE OpenFile(VAR f: File);
+
+        VAR
+          vdkp: VDkPtr;
+          fdp: FDPtr;
+
+      BEGIN 
+        WITH f DO
+          vdkp := vd.vdklist;
+          WHILE (vdkp<>NIL) AND (vdkp^.fno <> fileno) DO 
+            vdkp := vdkp^.nextvdk;
+          END;
+          IF vdkp = NIL THEN 
+            vdkp := submedium; 
+            WITH vdkp^ DO 
+              fno := fileno; vno := versionno; 
+              IF (fno>=files) OR (fno=dirfileno) THEN res := paramerror 
+              ELSE Setdf(fno, setread); 
+                WITH vd DO 
+                  IF df.res = done THEN     
+                    fdp := df.ela; 
+                    WITH fdp^ DO 
+                      IF (fdt <> father) OR (fno <> filno) OR 
+                         (vno <> universalversion) AND (vno <> versno)
+                      THEN res := unknownfile 
+                      ELSE vno := versno; 
+                        lgth := length; 
+                        perm := referenced <> 0;  (** PDP 11 **)
+                        prot := protection <> 0;  (** PDP 11 **)
+                        ptabbase := 0;
+                        CopyFromPagetab(fdp^, vdkp^);
+                      END; 
+                    END; 
+                  END; 
+                  FC(df, setopen); 
+                END;
+              END; 
+            END;
+          ELSE res := notsupported; 
+          END; 
+        END; 
+      END OpenFile; 
+ 
+ 
+    BEGIN
+      WITH f DO 
+        res := done;
+        IF com <= open THEN 
+          InitFile(f);
+          IF vd.on THEN 
+            AllocVDk(submedium);
+            IF submedium = CARDINAL(NIL) THEN res := toomanyfiles 
+            ELSE 
+              IF com = create THEN CreateFile(f) 
+              ELSE OpenFile(f) 
+              END; 
+              IF res <> done THEN DeallocVDk(submedium) END;
+            END;   
+          ELSE res := deviceoff   
+          END; 
+        END; (* IF com <= open *)
+        vdkp := submedium; p := vd.vdklist;  
+        WHILE (p <> NIL) AND (p <> vdkp) DO p := p^.nextvdk END; 
+        IF p = NIL THEN
+          oldres := res;
+          InitFile(f);
+          res := oldres;
+          IF res = done THEN res := paramerror END;
+        ELSE 
+          WITH vdkp^ DO  
+            IF state <> opened THEN (* get current position from f *)
+              IF (bufa = ADR(curbuf^.data)) AND 
+                 (bufa <= ela) AND (ela <= topa) AND  
+                 (bufa + TSIZE(DataArea) = topa)  
+              THEN 
+                WITH pos DO 
+                  byte := (ela - bufa) DIV TSIZE(WORD) * bytesinword;
+                  IF elodd AND (ela < topa) THEN INC(byte) END; 
+                  IF byte >= sectorsize THEN INC(block); byte := 0 END; 
+                  IF PosGtLgth(vdkp^) THEN 
+                    IF (block >= maxfilelength) AND
+                       ((byte > 0) OR (block > maxfilelength)) THEN
+                      block := maxfilelength; byte := 0; resp := eom;
+                    END;
+                    IF state = reading THEN pos := lgth 
+                    ELSE lgth := pos; lmod := TRUE  
+                    END; 
+                  END; 
+                END; 
+              ELSE res := paramerror;
+              END;
+            END; (* IF state <> opened *) 
+
+            CASE com OF
+
+              close:
+                CloseVDk(vdkp); InitFile(f); RETURN | 
+
+              create, open, getinternal: 
+                fileno := fno; versionno := vno | 
+ 
+              setopen, setread, setmodify, setwrite:
+                IF (com <> setmodify) OR (state <> reading) OR
+                   (pos.block <> curbuf^.sec) THEN
+                  SetOpenVDk(vdkp);
+                END;
+                IF com <> setopen THEN
+                  IF (com <> setread) AND prot THEN res := softprotected
+                  ELSE
+                    IF state = opened THEN
+                      INC(filesactive);
+                      IF fno <= backnamefileno THEN INC(filesusingone) END;
+                    END;
+                    IF com = setwrite THEN
+                      CutVDk(vdkp);
+                      IF (state <> writing) AND (fno > backnamefileno) THEN
+                        INC(filesusingone);
+                      END;
+                      state := writing;
+                    ELSIF com = setread THEN state := reading
+                    ELSE state := modifying;
+                      IF NOT modifyed THEN
+                        IF fno < fixedfiles THEN (* security!! *)
+                          modifyed := TRUE;
+                        ELSE
+                          Setdf(fno, setmodify);
+                          WITH vd DO
+                            WITH df DO
+                              IF res = done THEN
+                                fdp := ela;
+                                WITH fdp^ DO
+                                  IF (fdt=father) AND (fno=filno) THEN
+                                    SetModifyTime(fdp);
+                                  END;
+                                END;
+                                ela := topa;
+                              END;
+                              FC(df, setopen);
+                              IF res = done THEN modifyed := TRUE END;
+                            END;
+                          END;
+                        END;
+                      END;
+                    END;
+                    SetReadAhead;
+                  END;
+                END; |
+
+              doio: |
+
+              setpos:
+                oldpos := pos;
+                pos.block := highpos * 256 + lowpos DIV sectorsize;
+                pos.byte := lowpos MOD sectorsize;
+                IF PosGtLgth(vdkp^) THEN
+                  pos := oldpos; res := paramerror
+                END;
+                IF state = writing THEN CutVDk(vdkp) END |
+
+              getpos, length:
+                IF com = getpos THEN
+                  highpos := pos.block; lowpos := pos.byte;
+                ELSE
+                  highpos := lgth.block; lowpos := lgth.byte;
+                END;
+                lowpos := lowpos+highpos MOD secinblock*sectorsize;
+                highpos := highpos DIV secinblock |
+
+              setpermanent, setprotect:
+                changed := FALSE;
+                IF com = setpermanent THEN
+                  on := on = TRUE; (* fix uninitialized parameter *)
+                  IF NOT on AND (prot OR (fno < fixedfiles)) THEN
+                    res := softprotected
+                  ELSIF perm <> on THEN
+                    perm := on; changed := TRUE;
+                  END
+                ELSE (* com = protect *)
+                  wrprotect := wrprotect = TRUE; (* fix parameter *)
+                  IF NOT perm THEN res := notdone; wrprotect := FALSE
+                  ELSIF prot <> wrprotect THEN
+                    prot := wrprotect; changed := TRUE;
+                  END; 
+                END; 
+                IF changed THEN 
+                  WITH vd DO 
+                    Setdf(fno, setmodify);   
+                    WITH df DO 
+                      IF res = done THEN 
+                        fdp := ela;
+                        WITH fdp^ DO 
+                          IF prot THEN  protection := modifyprot
+                          ELSE protection := 0 END;
+                          IF perm THEN referenced := 1
+                          ELSE referenced := 0 END; (** PDP 11 **)
+                        END;  
+                        ela := topa; 
+                        FC(df, setopen); 
+                      END; 
+                    END;   
+                    res := df.res 
+                  END; (* WITH vd *) 
+                END; |
+
+              getpermanent:
+                on := perm |
+
+              getprotect:
+                wrprotect := prot  
+
+            ELSE res := paramerror
+            END; (* CASE *)
+
+            flags := flags - FlagSet{rd, wr, er, ef}; 
+            IF state = opened THEN 
+              bufa := NIL; ela := NIL; ina := NIL; topa := NIL; 
+              elodd := FALSE; inodd := FALSE;   
+              IF res = done THEN res := resp END; 
+              eof := TRUE; resp := done;
+            ELSE (* state <> opened *)
+              GetBuf(vdkp);
+              WITH pos DO 
+                bufa := ADR(curbuf^.data); 
+                topa := bufa + TSIZE(DataArea); 
+                ela := bufa + byte DIV 2 * TSIZE(WORD); 
+                elodd := ODD(byte); 
+                IF lgth.block = block THEN 
+                  ina := bufa + lgth.byte DIV 2 * TSIZE(WORD); 
+                  inodd := ODD(lgth.byte); 
+                ELSE ina := topa; inodd := FALSE
+                END;
+                IF elodd OR ODD(lgth.byte) THEN
+                  INCL(flags, bytemode)
+                END;
+              END; 
+              IF res = done THEN res := resp END; 
+              eof := PosEqLgth(vdkp^); 
+              IF state <= modifying THEN INCL(flags, rd) END;
+              IF state >= modifying THEN INCL(flags, wr) END; 
+            END; 
+          END; (* WITH vdkp^ *)   
+        END; (* IF p = NIL *)
+        IF res <> done THEN eof := TRUE; INCL(flags, er) END; 
+        IF eof THEN INCL(flags, ef) END;
+      END; (* WITH f *)  
+    END FileCommand;
+   
+     
+    PROCEDURE FC(VAR f: File; c: Command);
+    BEGIN   
+      f.com := c; FileCommand(f)
+    END FC; 
+
+ 
+    PROCEDURE Reset;
+      VAR vdkp: VDkPtr; 
+    BEGIN
+      DiskReset;
+      filesactive := 0; filesusingone := 0; nonsequentialfiles := 0;
+      WITH vd DO
+        IF on THEN
+          vdkp := vdklist;
+          WHILE vdkp <> NIL DO
+            WITH vdkp^ DO
+              IF state <> opened THEN
+                INC(filesactive);
+                IF (state = writing) OR (fno <= backnamefileno) THEN
+                  INC(filesusingone);
+                END;
+                IF isnonsequential THEN INC(nonsequentialfiles) END;
+              END;
+              vdkp := nextvdk;
+            END;
+          END;
+          SetReadAhead;
+          LOOP
+            vdkp := vdklist;
+            WHILE (vdkp <> NIL) AND (vdkp^.level < CurrentLevel()) DO
+              vdkp := vdkp^.nextvdk;
+            END;
+            IF vdkp = NIL THEN EXIT END;
+            CloseVDk(vdkp);
+          END;
+        END;
+      END;
+    END Reset;
+
+     
+    PROCEDURE ReadFileDesc(fno: FileNumber; VAR fd: FileDesc; VAR r: Response); 
+      VAR fdp: FDPtr;
+    BEGIN
+      IF fno >= files THEN r := paramerror
+      ELSE 
+        WITH vd DO 
+          Setdf(fno, setread); 
+          WITH df DO 
+            IF res = done THEN 
+              fdp := ela; fd := fdp^; 
+              FC(df, setopen) 
+            END; 
+            r := res 
+          END 
+        END 
+      END 
+    END ReadFileDesc; 
+ 
+
+    PROCEDURE WriteFileDesc(fno: FileNumber; VAR fd: FileDesc; VAR r: Response);
+      VAR fdp: FDPtr; 
+    BEGIN 
+      IF fno >= files THEN r := paramerror 
+      ELSE 
+        WITH vd DO 
+          Setdf(fno, setmodify); 
+          WITH df DO 
+            IF res = done THEN 
+              fdp := ela; fdp^ := fd;
+              FC(df, setopen) 
+            END; 
+            r := res; 
+          END 
+        END 
+      END 
+    END WriteFileDesc; 
+ 
+ 
+    PROCEDURE Opendf; 
+      VAR vdkp: VDkPtr; 
+    BEGIN 
+      WITH vd DO 
+        InitFile(df); 
+        WITH df DO 
+          AllocVDk(submedium); vdkp := submedium;
+          WITH vdkp^ DO 
+            fno := dirfileno; vno := universalversion; 
+            lgth.block := files; lgth.byte := 0;
+            modifyed := TRUE; 
+            perm := TRUE;
+            resp := done; 
+          END 
+        END 
+      END 
+    END Opendf; 
+ 
+ 
+    PROCEDURE InitVol(VAR r: Response);  
+
+      VAR fno: CARDINAL;
+
+      PROCEDURE InitFile(fno: FileNumber; base, blocks: CARDINAL);
+
+        VAR
+          fdp: FDPtr;
+          i: CARDINAL;
+          t: Time;
+ 
+      BEGIN   
+        WITH vd DO 
+          WITH df DO
+            highpos := fno DIV secinblock;
+            lowpos := fno MOD secinblock * sectorsize;
+            FC(df, setpos);
+            IF res = done THEN FC(df, setmodify) END; 
+            IF res = done THEN 
+              fdp := ela; 
+              WITH fdp^ DO 
+                reserved := 0; 
+                filno := fno; versno := universalversion;
+                FOR i := 0 TO maxfiller DO filler[i] := 0 END; 
+                FOR i := 0 TO pagetablength-1 DO pagetab[i] := pagenil END; 
+                IF base >= pages THEN fdt := nofile  
+                ELSE fdt := father; 
+                  length.block := blocks; length.byte := 0;
+                  referenced := 1;
+                  GetTime(t);
+                  ctime.day := t.day;
+                  ctime.minute := t.minute;
+                  mtime := ctime;
+                  modification := 0;
+                  IF fno IN {bootfileno, backbootfileno,
+                             dirfileno, namefileno} THEN
+                    protection := 0
+                  ELSE protection := modifyprot; 
+                  END;
+                  FOR i := 1 TO sons-1 DO sontab[i] := cardnil END;   
+                  blocks := (blocks + pagesize - 1) DIV pagesize;
+                  FOR i := 1 TO blocks DO
+                    pagetab[i-1] := (base + i - 1) * pagecheck;
+                  END; 
+                END 
+              END; 
+              ela := topa; 
+              FC(df, setopen); 
+            END;
+          END;   
+        END; 
+      END InitFile; 
+
+    BEGIN 
+      WITH vd DO 
+        IF on THEN r := callerror 
+        ELSE on := TRUE; r := done; 
+          Opendf; 
+          FOR fno := 0 TO files-1 DO InitFile(fno, cardnil, 0) END; 
+          InitFile(dirfileno, dirfilebase, dirfilelength); 
+          InitFile(backdirfileno, backdirfilebase, dirfilelength); 
+          InitFile(namefileno, namefilebase, namefilelength); 
+          InitFile(backnamefileno, backnamefilebase, namefilelength); 
+          InitFile(badfileno, 0, 0); 
+          InitFile(bootfileno, bootfilebase, bootfilelength); 
+          InitFile(backbootfileno, backbootfilebase, bootfilelength); 
+          InitFile(dumpfileno, dumpfilebase, dumpfilelength); 
+          InitFile(dump1fileno, dump1filebase, dumpfilelength); 
+          FC(df, close);
+          on := FALSE; 
+        END; 
+      END; 
+    END InitVol; 
+ 
+ 
+    PROCEDURE OpenVol(VAR r: Response); 
+
+      VAR 
+        i, p, fno: CARDINAL;
+        fdp: FDPtr;
+        f: File;
+        r1: Response; 
+ 
+    BEGIN 
+      WITH vd DO 
+        IF on THEN r := callerror 
+        ELSE
+          DiskReset;
+          r := DiskStatus();
+          IF r = done THEN
+            InitVolume; on := TRUE;
+            Opendf; 
+            WITH df DO
+              fno := 0;
+              LOOP
+                IF fno >= files THEN EXIT END;
+                Setdf(fno, setread);
+                IF res <> done THEN
+                  IF r = done THEN r := res END;
+                  FC(df, setopen); EXIT
+                END; 
+                fdp := ela;
+                WITH fdp^ DO
+                  IF fdt <> nofile THEN
+                    IF fdt = father THEN
+                      IF referenced = 0 THEN
+                        WITH f DO
+                          fileno := filno; versionno := versno;
+                        END;
+                        FC(df, setopen);
+                        FC(f, open); FC(f, setwrite);
+                        IF f.res <> done THEN r := f.res END;
+                        FC(f, close);
+                      ELSE
+                        SetFile(filno); 
+                        i := 0; 
+                        WHILE (i<pagetablength)AND(pagetab[i]<pagenil) DO
+                          IF pagetab[i] MOD pagecheck <> 0 THEN
+                            WriteString('- DiskSystem.OpenVolume: ');
+                            WriteString('bad page pointer: ');
+                            WriteString('fno = '); WriteOct(fno);
+                            WriteString(' pageno = '); WriteOct(i);
+                            WriteString(' page = '); WriteOct(pagetab[i]);
+                            WriteLn;
+                            r := softerror;
+                          ELSE 
+                            SetPage(pagetab[i]);
+                          END; 
+                          INC(i) 
+                        END;
+                      END;
+                    ELSE
+                      WriteString('- DiskSystem.OpenVolume: ');
+                      WriteString('Long files are not supported by this system');
+                      WriteLn;
+                      r := notsupported;
+                    END;
+                  END;
+                END;
+                FC(df, setopen);
+                INC(fno);
+              END; (* LOOP *)
+              IF r = done THEN r := res END;
+            END;
+            on := r = done;
+          END;
+        END;
+      END;
+    END OpenVol;
+
+
+    PROCEDURE CloseVol(VAR r: Response);
+    BEGIN
+      WITH vd DO
+        IF NOT on THEN r := callerror
+        ELSIF vdklist^.nextvdk <> NIL THEN r := notdone
+        ELSE FC(df, close); r := df.res; on := FALSE
+        END
+      END
+    END CloseVol;
+
+
+  BEGIN (* initialisation code for VirtualDisk *)
+    filesactive := 0; filesusingone := 0; nonsequentialfiles := 0;
+    SetReadAhead;
+    InitVolume;
+    (* initialise the Reset from a terminated level *)
+    TermProcedure(Reset);
+  END VirtualDisk;
+
+
+  MODULE Names;
+
+    FROM SYSTEM IMPORT
+      WORD, TSIZE;
+
+    FROM FileSystem IMPORT 
+      File, Command, Response,
+      Flag, FlagSet;
+ 
+    IMPORT 
+      files,
+      Name, NameKind, ExternalName, enlength,
+      free, fname,   (** PDP 11 **)
+      universalversion, 
+      dirfileno, backdirfileno, 
+      namefileno, backnamefileno, 
+      badfileno, 
+      bootfileno, backbootfileno, 
+      dumpfileno, dump1fileno,
+      FileCommand; 
+
+    FROM CardinalIO IMPORT WriteOct;
+
+    FROM Terminal IMPORT WriteString, WriteLn;
+ 
+    EXPORT  
+      DirectoryCommand, 
+      ReadName, WriteName, 
+      InitNames, OpenNames, CloseNames;
+ 
+ 
+    CONST 
+      namesize = 16; (* in WORDs *)
+ 
+    VAR 
+      nf: File;  (* name file *) 
+
+       
+    PROCEDURE FC(VAR f: File; c: Command);
+    BEGIN   
+      f.com := c; FileCommand(f)
+    END FC; 
+
+ 
+(*$T-,$R-*) 
+    PROCEDURE EqualEN(VAR en1, en2: ExternalName): BOOLEAN;
+      VAR i: CARDINAL;
+    BEGIN 
+      i := 0;
+      WHILE (i < enlength) AND (en1[i] = en2[i]) DO INC(i) END;
+      RETURN i >= enlength  
+    END EqualEN; 
+ 
+
+    PROCEDURE ConvertName(VAR en: ExternalName); (** PDP 11 only *)
+      VAR i: CARDINAL; ch: CHAR;
+    BEGIN
+      IF TSIZE(WORD) = 2 THEN (* The PDP 11 *)
+        i := 0;
+        WHILE i < enlength-1 DO
+          ch := en[i]; en[i] := en[i+1]; en[i+1] := ch;
+          INC(i, 2);
+        END;
+      END;
+    END ConvertName;
+(*$T=,$R=*)
+
+    PROCEDURE CheckName(no: CARDINAL; VAR na: Name; VAR r: Response);
+    BEGIN
+      IF (na.nk = fname) AND (na.fno <> no) THEN
+        WriteString('- DiskSystem.(ReadName, WriteName or SearchName): ');
+        WriteString('bad file number in name entry'); WriteLn;
+        WriteString('  file name = '); WriteString(na.en); WriteLn;
+        WriteString('  found fno = '); WriteOct(na.fno);
+        WriteString(', expected fno = '); WriteOct(no); WriteLn;
+        r := softerror;
+      ELSE r := done
+      END;
+    END CheckName;
+
+
+    PROCEDURE SearchName(VAR na: Name; VAR r: Response); 
+ 
+      VAR np: POINTER TO Name; found: BOOLEAN; no: CARDINAL;
+ 
+    BEGIN 
+      ConvertName(na.en);     (** PDP 11 only *)
+      WITH nf DO
+        found := FALSE; 
+        highpos := 0; lowpos := 0; FC(nf, setpos);
+        IF res = done THEN
+          FC(nf, setread); no := 0;
+          WHILE NOT (eof OR found) DO 
+            WHILE (ela + TSIZE(Name) <= ina) AND NOT found DO
+              np := ela; 
+              found := (np^.nk = fname) AND EqualEN(na.en, np^.en);
+              INC(ela, TSIZE(Name)); INC(no); 
+            END; 
+            IF NOT found THEN FC(nf,doio) END; 
+          END; 
+          IF res <> done THEN r := res 
+          ELSIF found THEN
+            r := done; na := np^; CheckName(no-1, na, r);
+          ELSE r := notdone 
+          END; 
+        ELSE r := res
+        END;
+      END;
+      ConvertName(na.en); 
+    END SearchName; 
+ 
+ 
+    PROCEDURE ReadName(no: CARDINAL; VAR na: Name; VAR r: Response); 
+
+      VAR np: POINTER TO Name;
+ 
+    BEGIN 
+      IF no < files THEN 
+        WITH nf DO 
+          highpos := 0; lowpos := no * namesize * 2;   
+          FC(nf, setpos);
+          IF res = done THEN
+            IF flags * FlagSet{rd, wr} <> FlagSet{rd} THEN 
+              FC(nf, setread);
+            END; 
+            IF res = done THEN 
+              np := ela; na := np^;
+              ConvertName(na.en);      (** PDP 11 only *)
+            END 
+          END;   
+          r := res;
+          IF r = done THEN CheckName(no, na, r) END; 
+        END 
+      ELSE r := paramerror 
+      END;
+    END ReadName; 
+ 
+ 
+    PROCEDURE WriteName(no: CARDINAL; na: Name; VAR r: Response); 
+ 
+      VAR np: POINTER TO Name; 
+ 
+    BEGIN 
+      CheckName(no, na, r);
+      IF r = done THEN
+        ConvertName(na.en);      (** PDP 11 only *)
+        IF no < files THEN 
+          WITH nf DO 
+            highpos := 0; lowpos := no * namesize * 2; 
+            FC(nf, setpos); 
+            IF res = done THEN 
+              FC(nf, setmodify); 
+              IF res = done THEN 
+                np := ela; np^ := na;  
+                FC(nf, setopen);
+              END; 
+            END;   
+            r := res 
+          END 
+        ELSE r := paramerror
+        END;
+      END 
+    END WriteName; 
+
+ 
+    PROCEDURE DirectoryCommand(VAR f: File; fn: ARRAY OF CHAR); 
+      (* executes the given directorycommand *) 
+       
+      VAR
+        na: Name;
+        i, j, top: CARDINAL;
+        ok, empty: BOOLEAN;
+        ch, cch: CHAR;
+        r: Response;
+        lnew: BOOLEAN;
+ 
+    BEGIN
+      WITH f DO 
+        IF (com <> lookup) AND (com <> rename) THEN res := paramerror
+        ELSE res := done;   
+          i := 0; top := HIGH(fn);
+          ok := TRUE;
+          ch := fn[0];
+          empty := (ch = ' ') OR (ch = 0C); 
+          IF NOT empty THEN
+            LOOP 
+              IF i > top THEN ok := FALSE; EXIT END; 
+              ch := fn[i]; cch := CAP(ch); 
+              ok := ('A' <= cch) AND (cch <= 'Z');
+              IF NOT ok THEN EXIT END;
+              REPEAT 
+                INC(i); 
+                IF i > top THEN EXIT END;
+                ch := fn[i]; cch := CAP(ch); 
+              UNTIL ((cch<'A') OR ('Z'<cch)) AND ((ch<'0') OR ('9'<ch));
+              IF ch = '.' THEN INC(i)
+              ELSE EXIT
+              END;                   
+            END;
+            ok := ok AND (i<=enlength) AND ((i>top) OR (ch=' ') OR (ch=0C));
+          END;     
+          IF NOT ok THEN res := paramerror
+          ELSE
+            WITH na DO
+              j := 0;
+              WHILE j < i DO en[j] := fn[j]; INC(j) END;
+              FOR j := i TO enlength-1 DO en[j] := ' ' END;
+              IF com = lookup THEN 
+                IF empty THEN res := paramerror
+                ELSE 
+                  SearchName(na, res); 
+                  IF res = done THEN 
+                    lnew := new;
+                    fileno := fno; versionno := vno;
+                    FC(f, open);
+                    IF res = unknownfile THEN
+                      nk := free; 
+                      WriteName(fno, na, r); 
+                      new := lnew; res := notdone;
+                    ELSIF res = done THEN
+                      FC(f, getpermanent);
+                      IF NOT on THEN
+                        on := TRUE; FC(f, setpermanent);
+                      END;
+                      new := FALSE; 
+                    END; 
+                  END;
+                  IF new AND (res = notdone) THEN 
+                    FC(f, create); 
+                    IF res = done THEN 
+                      nk := fname; 
+                      fno := fileno; vno := versionno; fres := 0;
+                      WriteName(fno, na, res);
+                      IF res = done THEN
+                        on := TRUE; FC(f, setpermanent);
+                      END;
+                      new := TRUE
+                    END;
+                  END;    
+                  com := lookup; 
+                END;
+              ELSE (* com = rename *) 
+                IF empty THEN
+                  on := FALSE; FC(f, setpermanent);
+                  IF res = done THEN   
+                    FC(f, getinternal);
+                    nk := free;
+                    WriteName(fileno, na, res);
+                  END    
+                ELSE (* not empty filename *)
+                  SearchName(na, res); 
+                  IF res = notdone THEN
+                    FC(f, getinternal);   
+                    nk := fname; 
+                    fno := fileno; vno := versionno; fres := 0;
+                    FC(f, getprotect);
+                    IF res = done THEN
+                      IF wrprotect THEN res := softprotected
+                      ELSE WriteName(fno, na, res);
+                      END;
+                    END; 
+                    IF res = done THEN
+                      on := TRUE; FC(f, setpermanent); 
+                    END 
+                  ELSE res := notdone 
+                  END; 
+                END; (* IF empty *)
+                com := rename;
+              END; (* IF com = lookup *)
+            END; (* WITH na *)
+          END; (* IF NOT ok *)
+        END; (* IF a covered command *)
+      END; (* WITH f *)
+    END DirectoryCommand; 
+ 
+ 
+    PROCEDURE InitNames(VAR r: Response); 
+        VAR na: Name; i: CARDINAL;
+
+      PROCEDURE Catalog(no: CARDINAL; n: ExternalName);
+        VAR na: Name; i: CARDINAL; ch: CHAR;
+      BEGIN 
+        WITH na DO
+          ch := '&'; 
+          FOR i := 0 TO enlength-1 DO 
+            IF ch <> ' ' THEN ch := n[i] END; 
+            IF ch = 0C THEN ch := ' ' END; 
+            en[i] := ch;
+          END; 
+          nk := fname; 
+          fno := no; vno := universalversion; fres := 0; 
+        END; 
+        IF r = done THEN WriteName(no, na, r) END;
+      END Catalog;
+         
+    BEGIN 
+      r := done;
+      WITH nf DO 
+        fileno := namefileno; versionno := universalversion;
+        FC(nf, open); 
+        IF res = done THEN 
+          WITH na DO 
+            en := '                        '; 
+            nk := free;
+            i := 0;
+            REPEAT
+              WriteName(i, na, r); INC(i)
+            UNTIL (i >= files) OR (r <> done);
+          END;     
+          Catalog(dirfileno, 'FS.FileDirectory');
+          Catalog(backdirfileno, 'FS.FileDirectory.Back');
+          Catalog(namefileno, 'FS.NameDirectory'); 
+          Catalog(backnamefileno, 'FS.NameDirectory.Back'); 
+          Catalog(badfileno, 'FS.BadPages');  
+          Catalog(bootfileno, 'PC.BootFile'); 
+          Catalog(backbootfileno, 'PC.BootFile.Back'); 
+          Catalog(dumpfileno, 'PC.DumpFile'); 
+          Catalog(dump1fileno, 'PC.Dump1File');
+          FC(nf, close);
+        ELSE r := res 
+        END; 
+      END 
+    END InitNames;   
+ 
+ 
+    PROCEDURE OpenNames(VAR r: Response); 
+    BEGIN 
+      WITH nf DO 
+        fileno := namefileno; versionno := universalversion; 
+        FC(nf, open); 
+        r := res 
+      END; 
+    END OpenNames; 
+ 
+ 
+    PROCEDURE CloseNames(VAR r: Response); 
+    BEGIN 
+      FC(nf, close); r := nf.res 
+    END CloseNames; 
+ 
+ 
+  BEGIN
+    nf.submedium := NIL; (* some strange value *)
+  END Names;
+
+
+  PROCEDURE InitVolume(VAR r: Response);
+    VAR res: Response;
+  BEGIN
+    InitVol(r);
+    IF r = done THEN
+      OpenVol(r);
+      IF r = done THEN
+        InitNames(r);
+        CloseVol(res);
+        IF r = done THEN r := res END
+      END
+    END
+  END InitVolume;
+
+
+  PROCEDURE OpenVolume(VAR r: Response);
+    VAR ok: BOOLEAN;
+  BEGIN
+    OpenVol(r);
+    IF r = done THEN
+      OpenNames(r);
+      IF r = done THEN
+        CreateMedium(mediumtype, mediumno, FileCommand, DirectoryCommand, ok);
+        IF NOT ok THEN r := notdone END;
+      END;
+    END;
+  END OpenVolume;
+
+
+  PROCEDURE CloseVolume(VAR r: Response);
+    VAR ok: BOOLEAN;
+  BEGIN
+    RemoveMedium(mediumtype, mediumno, ok);
+    IF ok THEN
+      CloseNames(r);
+      IF r = done THEN
+        CloseVol(r);
+        IF r <> done THEN
+          OpenNames(r); r := notdone;
+          CreateMedium(mediumtype, mediumno, FileCommand, DirectoryCommand, ok);
+        END;
+      ELSE
+        CreateMedium(mediumtype, mediumno, FileCommand, DirectoryCommand, ok);
+      END;
+    ELSE r := unknownmedium;
+    END;
+  END CloseVolume;
+
+
+END DiskSystem.

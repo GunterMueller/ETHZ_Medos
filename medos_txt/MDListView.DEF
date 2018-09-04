@@ -1,0 +1,8 @@
+DEFINITION MODULE MDListView; (* C. Binding,
+                                 minor modifications by Ch.J.; HK.B. 10.6.81 *)
+  EXPORT QUALIFIED ShowList, TerminateListView;
+
+  PROCEDURE ShowList(mod: CARDINAL; pc: CARDINAL);
+  PROCEDURE TerminateListView;
+
+END MDListView.

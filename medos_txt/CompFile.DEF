@@ -1,0 +1,56 @@
+DEFINITION MODULE CompFile;  (* LG 22.07.82 *)
+
+  FROM SYSTEM IMPORT WORD;
+
+  EXPORT QUALIFIED
+    File,
+    eolc,
+    Open, Create, Close, Delete,
+    GetPos, SetPos, Reset,
+    ReadChar, WriteChar, ReadWord, WriteWord, ModifyWord,
+    EndFile;
+
+  TYPE File;
+
+  CONST eolc = 36C; (* end of line character for character files *)
+
+  PROCEDURE Open(VAR f: File; name: ARRAY OF CHAR; VAR done: BOOLEAN);
+    (* Open a file already existing in directory *)
+
+  PROCEDURE Create(VAR f: File; name: ARRAY OF CHAR; VAR done: BOOLEAN);
+    (* Open a new file *)
+
+  PROCEDURE Close(VAR f: File; VAR done: BOOLEAN);
+    (* Close a file, enter a new name into directory *)
+
+  PROCEDURE Delete(VAR f: File; VAR done: BOOLEAN);
+    (* Close a file, remove from directory *)
+
+  PROCEDURE GetPos(VAR f: File; VAR highpos, lowpos: CARDINAL);
+    (* Get current position of the file *)
+
+  PROCEDURE SetPos(VAR f: File; highpos, lowpos: CARDINAL);
+    (* Set file to indicated position *)
+
+  PROCEDURE Reset(VAR f: File);
+    (* Position the file at the beginning and set to idle mode *)
+
+  PROCEDURE ReadChar(VAR f: File; VAR ch: CHAR);
+    (* Read a character from file *)
+
+  PROCEDURE WriteChar(VAR f: File; ch: CHAR);
+    (* Write a character to file *)
+
+  PROCEDURE ReadWord(VAR f: File; VAR w: WORD);
+    (* Read a word from file *)
+
+  PROCEDURE WriteWord(VAR f: File; w: WORD);
+    (* Write a word to file *)
+
+  PROCEDURE ModifyWord(VAR f: File; w: WORD);
+    (* Modify a word on file *)
+
+  PROCEDURE EndFile(VAR f: File): BOOLEAN;
+    (* End of file reached *)
+
+END CompFile.

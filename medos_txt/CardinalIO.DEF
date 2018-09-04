@@ -1,0 +1,33 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          CardinalIO:                 *
+*                                      *
+*          Utility privat to MEDOS-2   *
+*          for reading and writing     *
+*          CARDINALS to an from the    *
+*          Terminal.                   *
+*                                      *
+*          Version 2  25.09.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE CardinalIO;
+
+  EXPORT QUALIFIED ReadOct, WriteOct;
+
+  PROCEDURE ReadOct(VAR c: CARDINAL);
+
+  PROCEDURE WriteOct(c: CARDINAL);
+
+END CardinalIO.
+

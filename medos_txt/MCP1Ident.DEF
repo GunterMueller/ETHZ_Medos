@@ -1,0 +1,27 @@
+(****************************************
+*                                       *
+*     MODULA-2 Multi-Pass Compiler      *
+*     ****************************      *
+*                                       *
+*     Implementation for Lilith         *
+*                                       *
+*                                       *
+*     MCP1Ident:                        *
+*                                       * 
+*     Identifier handling in Pass 1     *
+*                                       * 
+*     Version C19 of 19.04.82           *
+*                                       *
+*     Institut fuer Informatik          *
+*     ETH-Zuerich                       *
+*     CH-8092 Zuerich                   *
+*                                       *
+****************************************)
+
+DEFINITION MODULE MCP1Ident;     (* LG *)
+
+  EXPORT QUALIFIED InitIdTables;
+
+  PROCEDURE InitIdTables;
+
+END MCP1Ident.

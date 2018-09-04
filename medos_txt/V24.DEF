@@ -1,0 +1,37 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          V24:                        *
+*                                      *
+*          V24 reads from and writes   *
+*          to the asyncronous V24      *
+*          connection. No conversions  *
+*          are included.               * 
+*                                      *
+*          Version 2   5.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE V24;
+
+  EXPORT QUALIFIED
+    BusyRead, Read, Write;
+
+
+  PROCEDURE BusyRead(VAR ch: CHAR; VAR got: BOOLEAN);
+
+  PROCEDURE Read(VAR ch: CHAR);
+
+  PROCEDURE Write(ch: CHAR);
+
+END V24.
+

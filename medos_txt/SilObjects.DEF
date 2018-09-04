@@ -1,0 +1,25 @@
+DEFINITION MODULE SilObjects;  (*NW 15.2.83*)
+  EXPORT QUALIFIED
+    DrawLine, MakeString, Fill, Backspace, CloseString, MakeMacro,              
+    Select, Deselect, Delete, Move, Copy, Input, Output,
+    Rebuild, OpenMacro, CloseMacro, Restart;
+
+  PROCEDURE DrawLine;
+  PROCEDURE MakeString;
+  PROCEDURE Fill(ch: CHAR);
+  PROCEDURE Backspace;
+  PROCEDURE CloseString;
+  PROCEDURE MakeMacro(m,n: CARDINAL);
+  PROCEDURE Select;
+  PROCEDURE Deselect;
+  PROCEDURE Delete;
+  PROCEDURE Move;
+  PROCEDURE Copy;
+  PROCEDURE Input(name: ARRAY OF CHAR; xorg: INTEGER; VAR done: BOOLEAN);
+  PROCEDURE Output(name: ARRAY OF CHAR; xorg: INTEGER; VAR done: BOOLEAN);
+  PROCEDURE Rebuild;
+  PROCEDURE OpenMacro(n: CARDINAL; name: ARRAY OF CHAR; VAR done: BOOLEAN);
+  PROCEDURE CloseMacro(n: CARDINAL);
+  PROCEDURE Restart(reduce: BOOLEAN);
+ 
+END SilObjects.

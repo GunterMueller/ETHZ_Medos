@@ -1,0 +1,8 @@
+DEFINITION MODULE MDDialogView;  (* Ch. Jacobi  3.6.81*)
+
+  EXPORT QUALIFIED InstallDialogCommand;
+
+  PROCEDURE InstallDialogCommand(p: PROC; menu: ARRAY OF CHAR);
+
+END MDDialogView.
+

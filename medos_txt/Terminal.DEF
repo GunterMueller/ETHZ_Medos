@@ -1,0 +1,43 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          Terminal:                   *
+*                                      *
+*          Standard Input              *
+*          Standard Output             *
+*                                      *
+*          Version 2  24.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE Terminal;
+
+  EXPORT QUALIFIED
+    Read, BusyRead, ReadAgain,
+    Write, WriteString, WriteLn;
+
+
+  PROCEDURE Read(VAR ch: CHAR);
+
+  PROCEDURE BusyRead(VAR ch: CHAR);
+
+  PROCEDURE ReadAgain;
+
+
+  PROCEDURE Write(ch: CHAR);
+
+  PROCEDURE WriteString(string: ARRAY OF CHAR);
+
+  PROCEDURE WriteLn;
+
+END Terminal.
+

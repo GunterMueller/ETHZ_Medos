@@ -1,0 +1,114 @@
+(*PRIVAT; NOT for public usage;
+  for public usage other version exists *)
+(********************************
+*                               * 
+*    Screen                     *
+*    ******                     *
+*                               *
+*    Version 4   6.6.82         *
+*                               *
+*    Christian Jacobi           * 
+*    Institut fuer Informatik   *
+*    ETH-Zuerich                *
+*    CH-8092 Zuerich            *
+*                               *
+********************************) 
+
+DEFINITION MODULE Screen;  (* Ch. Jacobi 28.10.81 *)
+
+  FROM SYSTEM IMPORT ADDRESS, WORD;
+  EXPORT QUALIFIED 
+    Bitmap, Font, Mode, BlockDescriptor,
+    DisplayChar, Replicate, BlockTransfer, DisplayDot,
+    Proportional, FontHeight, FontWidth, FontBaseLine,
+    CharWidth,
+    GetSystemBitmap, GetSystemFont, 
+    GetDefaultBitmap, GetDefaultFont, GetDotPos, 
+    SetDefaultBitmap, SetDefaultFont, SetDotPos,
+    CreateBitmap, CreateSubBitmap, ReturnBitmap, ShowBitmap,
+    LoadFont, ReturnFont, GetFontName,
+    IsSubBitmap, GetRealFather, GetRealBlock, GetMaxBlock,
+
+    GetBmdA, GetFfpA, 
+    UseBitmap, UseFont;
+
+  TYPE
+    Bitmap;       
+    Font;
+    Mode = (replace,       (* d := s          , s      *)
+            paint,           (* d := d OR s     , d+s    *)
+            invert,        (* d := d XOR s    , d/s    *)
+            erase);        (* d := d AND NOT s, (-s)*d *)
+
+    BlockDescriptor =
+      RECORD
+        x, y, w, h: CARDINAL;
+      END;
+
+
+  PROCEDURE DisplayChar(VAR bm: Bitmap; VAR lineBlk: BlockDescriptor;
+                        VAR f: Font; ch: CHAR);
+
+  PROCEDURE Replicate(VAR bm: Bitmap; VAR destBlk: BlockDescriptor;
+                      m: Mode; VAR pattern: ARRAY OF WORD);
+
+  PROCEDURE BlockTransfer(VAR dbm: Bitmap; VAR destBlk: BlockDescriptor;
+                           m: Mode; VAR sbm: Bitmap; VAR sourceBlk: BlockDescriptor);
+
+  PROCEDURE DisplayDot(VAR bm: Bitmap; x, y: CARDINAL; m: Mode);
+
+
+  PROCEDURE Proportional(VAR f: Font): BOOLEAN;
+  PROCEDURE FontHeight(VAR f: Font): CARDINAL;
+  PROCEDURE FontWidth(VAR f: Font): CARDINAL;
+  PROCEDURE FontBaseLine(VAR f: Font): CARDINAL;
+  PROCEDURE CharWidth(VAR f: Font; ch: CHAR): CARDINAL;
+
+
+  PROCEDURE GetSystemBitmap(VAR bm: Bitmap);
+  PROCEDURE GetSystemFont(VAR f: Font);
+
+  PROCEDURE GetDefaultBitmap(VAR bm: Bitmap);
+  PROCEDURE GetDefaultFont(VAR f: Font);
+  PROCEDURE GetDotPos(VAR x, y: CARDINAL);
+
+  PROCEDURE SetDefaultBitmap(VAR bm: Bitmap); 
+  PROCEDURE SetDefaultFont(VAR f: Font);
+  PROCEDURE SetDotPos(x, y: CARDINAL);
+
+
+  PROCEDURE CreateBitmap(VAR bm: Bitmap; w,h: CARDINAL; VAR done: BOOLEAN);
+  PROCEDURE CreateSubBitmap(VAR bm: Bitmap; VAR father: Bitmap;
+                            location: BlockDescriptor; VAR done: BOOLEAN);
+  PROCEDURE ReturnBitmap(VAR bm: Bitmap);
+  PROCEDURE ShowBitmap(VAR bm: Bitmap);
+            
+
+  PROCEDURE LoadFont(VAR f: Font; name: ARRAY OF CHAR; VAR done: BOOLEAN);
+  PROCEDURE ReturnFont(VAR f: Font);
+  PROCEDURE GetFontName(VAR name: ARRAY OF CHAR; VAR f: Font);
+
+
+  PROCEDURE IsSubBitmap(VAR bm: Bitmap): BOOLEAN;
+  PROCEDURE GetRealFather(VAR fbm, bm: Bitmap);
+  PROCEDURE GetRealBlock(VAR blk: BlockDescriptor; VAR bm: Bitmap);
+  PROCEDURE GetMaxBlock(VAR blk: BlockDescriptor; VAR bm: Bitmap);
+
+(*******************************************************)
+(* following private procedures will change in future versions; 
+   only restricted usage*)
+
+
+  PROCEDURE GetBmdA(VAR bm: Bitmap; VAR bmda: ADDRESS);
+
+  PROCEDURE GetFfpA(VAR f: Font; VAR ffpa: ADDRESS);
+
+  PROCEDURE UseBitmap(VAR bm: Bitmap; w,h: CARDINAL;
+                      at, size: CARDINAL; VAR done: BOOLEAN);
+  PROCEDURE UseFont(VAR f: Font; name: ARRAY OF CHAR; 
+                    at, size: CARDINAL; VAR done: BOOLEAN);
+    (* at: framepointer to 4 word descriptor*)
+
+END Screen.
+
+

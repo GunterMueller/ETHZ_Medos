@@ -1,0 +1,1 @@
+DEFINITION MODULE DecoStatistic; (* Ch. Jacobi 1.4.81*)  FROM SYSTEM IMPORT WORD;  EXPORT QUALIFIED    InitStatistic, Count, CloseStatistic;    PROCEDURE InitStatistic(fn: ARRAY OF CHAR);    PROCEDURE CloseStatistic;    PROCEDURE Count(inst: WORD);END DecoStatistic.

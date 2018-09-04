@@ -1,0 +1,287 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          D140Disk:                   *
+*                                      *
+*          Privat driver in MEDOS.     *
+*                                      *
+*          Version 4  18.06.82         *    
+*          Version 42 26.10.82         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+IMPLEMENTATION MODULE D140Disk;
+
+  FROM SYSTEM IMPORT WORD, ADDRESS, ADR;
+  FROM FileSystem IMPORT Response;
+  FROM Monitor IMPORT TermProcedure;
+  FROM CardinalIO IMPORT WriteOct;
+  FROM FileMessage IMPORT WriteResponse;
+  FROM Terminal IMPORT WriteString, WriteLn;
+
+  CONST
+    bootmapfactor =     3;
+    mapfactor     =    12;
+    maxrepcnt     =     3; (* number of repetitions on errors *) 
+    boottrack     =     0; (* ..  3 *)
+    dumptrack     =     4; (* .. 25 *)
+    altboot       =    26; (* .. 29 *)
+    maplow        =    30; (* .. maxtrack *)
+    maxdiskadr    = 37631;
+   
+  VAR statusbits: BITSET; (* Bits within the last got drive status *)
+ 
+
+  CONST
+    (* Instructs for handling input and output.  *)
+    readw  = 240B;         (* read a word from channel *)
+    writew = 241B;         (* write a word to channel  *)
+    dskr   = 242B;         (* disk read  *)
+    dskw   = 243B;         (* disk write *)
+    setrk  = 244B;         (* set track  *)
+ 
+    (*  Get         Put           I/O channel assignments *)  
+    datain = 8;  dataout =  8;
+    status = 9;  command =  9;
+                 trackh  = 10;
+                 trackl  = 11;
+                 sector  = 12;
+     
+    (* Commands used with channel 'command' *) 
+    init       = 7;
+    faultreset = 6;
+    clearadr   = 5;
+    invsecreset = 4;
+ 
+    (* Status bits on channel 'status' *)
+    invsect    = 15; 
+    fault      = 14; 
+    readyseek  = 13; 
+    writeprot  = 12; 
+    timeouterr = 11;   
+    crcerr     = 10;
+    xfercompl  =  9;
+    readysrw   =  8; 
+ 
+    (* Functions to be added to sectornumber on channel 'sector' *)
+    read       = 80H;
+    write      = 40H;
+
+
+  PROCEDURE Get(channel: CARDINAL; VAR w: WORD);
+  CODE
+    readw
+  END Get;
+
+  PROCEDURE Put(channel: CARDINAL; w: WORD);
+  CODE
+    writew
+  END Put;
+
+  PROCEDURE Remap(drive, diskadr: CARDINAL; VAR tr, sec: CARDINAL);
+  BEGIN
+    tr := diskadr DIV sectors;
+    sec := diskadr MOD sectors;
+    IF tr >= maplow THEN
+      sec := mapfactor * sec;
+    ELSE sec := bootmapfactor * sec
+    END;
+    sec := sec MOD sectors + sec DIV sectors
+  END Remap;
+ 
+ 
+  PROCEDURE Wait(condition: BITSET);
+    VAR cnt: CARDINAL; 
+  BEGIN
+    cnt := 0; 
+    REPEAT
+     Get(status, statusbits);
+      INC(cnt);
+      IF cnt > 50000 THEN
+        statusbits := statusbits + {timeouterr};
+        WriteString('- D140Disk:  soft timeout in wait'); WriteLn;
+      END;
+    UNTIL statusbits * condition <> {} 
+  END Wait; 
+ 
+
+  PROCEDURE ConvertBits(rbit: CARDINAL; writing: BOOLEAN): Response;
+  BEGIN 
+    IF fault IN statusbits THEN RETURN harderror 
+    ELSIF timeouterr IN statusbits THEN RETURN timeout 
+    ELSIF crcerr IN statusbits THEN RETURN hardparityerror
+    ELSIF writing AND (writeprot IN statusbits)
+      THEN RETURN hardprotected
+    ELSIF invsect IN statusbits THEN RETURN harderror 
+    ELSIF NOT (rbit IN statusbits) THEN RETURN notdone
+    ELSE RETURN done 
+    END 
+  END ConvertBits; 
+ 
+ 
+  PROCEDURE DiskStatus(): Response; 
+  BEGIN 
+    Get(status, statusbits);
+    RETURN ConvertBits(readysrw, FALSE)
+  END DiskStatus; 
+
+
+  PROCEDURE DiskReset; 
+    VAR cnt: CARDINAL;
+  BEGIN 
+    Put(command, init); 
+    Put(command, faultreset);
+    Put(command, invsecreset);
+    cnt := 0;
+    REPEAT
+      INC(cnt);
+      Get(status, statusbits);
+    UNTIL (cnt>50000) OR (statusbits*{readysrw,fault,timeouterr}<>{})
+  END DiskReset; 
+
+
+  PROCEDURE SetTrack(tr: CARDINAL);
+  CODE
+    setrk;
+  END SetTrack;
+ 
+   
+  PROCEDURE DiskRead(drive, diskadr: CARDINAL;
+                     VAR b: ARRAY OF WORD;
+                     VAR r: Response);
+
+    VAR
+      tr, sec: CARDINAL;
+      oldr: Response; oldsb: BITSET; repcnt: CARDINAL;
+
+    PROCEDURE DskRd(addr: ADDRESS);
+    CODE
+      dskr;
+    END DskRd;
+
+
+  BEGIN
+    oldr := done; oldsb := {}; repcnt := 0;
+    IF (diskadr >= 37632) OR ( drive >= drives) THEN r := softerror
+    ELSE
+      LOOP
+        Remap(drive, diskadr, tr, sec);
+        r := DiskStatus();
+        IF r = harderror THEN DiskReset; r := DiskStatus() END; 
+        IF r = done THEN
+          SetTrack(drive * 40000B + tr);
+          Wait({readysrw, timeouterr, fault});
+          IF statusbits * {fault, timeouterr} = {} THEN
+            LOOP
+              Put(sector, sec + read);
+              Wait({xfercompl, timeouterr, invsect});
+              IF (invsect IN statusbits) AND (sec <= 48)
+              THEN
+                Put(command, faultreset);
+                Put(command, invsecreset);
+                IF sec < 48 THEN sec := 48 ELSE sec := 49 END;
+              ELSE EXIT
+              END;
+            END; (* LOOP *) 
+            IF statusbits * {fault,timeouterr,invsect}={} THEN
+              DskRd(ADR(b));
+            END;
+            r := ConvertBits(xfercompl, FALSE);
+          ELSE r := ConvertBits(readysrw, FALSE);
+          END; (* IF statusbits * *) 
+        END; (* IF r = done *)
+        IF r = done THEN EXIT
+        ELSE
+          IF oldr = done THEN oldr := r; oldsb := statusbits END;
+          DiskReset;
+          INC(repcnt);
+          IF repcnt >= maxrepcnt THEN EXIT END;
+        END;
+      END; (* LOOP *)
+    END; (* IF diskadr >= 37632 *)
+    IF r <> done THEN
+      WriteString('- D140Disk.DiskRead:');
+      WriteResponse(oldr); WriteLn;
+      WriteString('-          diskadr ='); WriteOct(diskadr);
+      WriteString(', statusbits ='); WriteOct(CARDINAL(oldsb));
+      WriteLn;
+    END;      
+  END DiskRead; 
+
+   
+  PROCEDURE DiskWrite(drive, diskadr: CARDINAL; 
+                     VAR b: ARRAY OF WORD;
+                      VAR r: Response);
+
+    VAR
+      tr, sec: CARDINAL;
+      oldr: Response; oldsb: BITSET; repcnt: CARDINAL;
+
+    PROCEDURE DskWr(addr: ADDRESS);
+    CODE
+      dskw;
+    END DskWr;
+
+  BEGIN
+    oldr := done; oldsb := {}; repcnt := 0;
+    IF (diskadr >= 37632) OR (drive >= drives) THEN r := softerror
+    ELSE
+      LOOP
+        Remap(drive, diskadr, tr, sec);
+        Get(status, statusbits);
+        r := ConvertBits(readysrw, FALSE);    
+        IF r = harderror THEN
+          DiskReset;
+          r := ConvertBits(readysrw, FALSE);
+        END;
+        IF r = done THEN 
+          SetTrack(drive * 40000B + tr);
+          Wait({readysrw, timeouterr, writeprot, fault});
+          IF statusbits * {timeouterr, writeprot, fault} = {} THEN
+            DskWr(ADR(b));
+            LOOP  
+              Put(sector, sec + write); 
+              Wait({xfercompl, timeouterr, invsect, writeprot});
+              IF (invsect IN statusbits) AND (sec <= 48)
+              THEN
+                Put(command, faultreset);
+                Put(command, invsecreset);
+                IF sec < 48 THEN sec := 48 ELSE sec := 49 END;
+              ELSE EXIT
+              END;
+            END; (* LOOP *)
+            r := ConvertBits(xfercompl, TRUE); 
+          ELSE r := ConvertBits(readysrw, TRUE); 
+          END; (* IF statusbits * *)
+        END; (* IF r = done *)
+        IF r = done THEN EXIT
+        ELSE
+          IF oldr = done THEN oldr := r; oldsb := statusbits END;
+          DiskReset;
+          INC(repcnt);
+          IF repcnt >= maxrepcnt THEN EXIT END;
+        END;
+      END; (* LOOP *)
+    END; (* IF diskadr >= 37632 *)
+    IF r <> done THEN
+      WriteString('- D140Disk.DiskWrite:');
+      WriteResponse(oldr); WriteLn;
+      WriteString('-          diskadr ='); WriteOct(diskadr);
+      WriteString(', statusbits ='); WriteOct(CARDINAL(oldsb));
+      WriteLn;
+    END;
+  END DiskWrite;
+ 
+
+BEGIN
+  TermProcedure(DiskReset);
+END D140Disk.

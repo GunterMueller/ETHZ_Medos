@@ -1,0 +1,24 @@
+DEFINITION MODULE Mouse;  (*NW 2.1.82*)
+  EXPORT QUALIFIED keys, Mx, My, curOn, mode,
+      TrackMouse, FlipCursor, ShowMenu;
+
+  VAR keys:   BITSET;    (*Mouse keys*)
+      Mx, My: INTEGER;   (*Mouse and cursor coordinates*)
+      curOn:  BOOLEAN;   (*cursor toggle switch; initial value = FALSE*)
+      mode:   CARDINAL;
+
+  PROCEDURE TrackMouse;
+    (*read Mouse coordinates Mx, My, and keys;
+      move cursor accordingly*)
+
+  PROCEDURE FlipCursor;
+    (*toggle switch for cursor*)
+
+  PROCEDURE ShowMenu(text: ARRAY OF CHAR; VAR selection: INTEGER);
+    (*show menu text at current cursor position, then follow the Mouse's
+      movements for command selection until menu key is released.
+      Selection = 0 means that no command was selected. In the text, command
+      lines are separated by "|". Command word have at most 7 characters,
+      and there must be at most 8 commands *)
+
+END Mouse.

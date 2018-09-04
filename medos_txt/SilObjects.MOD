@@ -1,0 +1,490 @@
+IMPLEMENTATION MODULE SilObjects;  (*NW 15.2.83*)
+  FROM SYSTEM IMPORT ADDRESS, TSIZE;
+  FROM SilDisplay IMPORT
+    FontHeight, PaintRectangle, WriteString, ShowChar, ClearMap;
+  FROM SilInput IMPORT
+    x0, x1, y0, y1, LineWidth, CurrentFont;
+  FROM Program IMPORT AllocateHeap, DeallocateHeap;
+  FROM FileSystem IMPORT
+    File, Response, Lookup, SetPos,
+    WriteWord, ReadWord, Close;
+ 
+  CONST SBufSize = 4000;
+    TextFonts = {0..3};
+    MacroSetNo = {4..5};
+    line = 7;
+
+  TYPE ObjMode = (on, selected, marked, off);
+    ObjPtr = POINTER TO Object; 
+    Object =
+      RECORD x, y, w, h: INTEGER;
+        mode: ObjMode;
+        next: ObjPtr;
+        CASE kind: CARDINAL OF
+          0..3: ix:  CARDINAL    (*string*) |
+          4..5: mac: CARDINAL    (*macro*) | 
+             7: dead: ObjPtr     (*line*)
+        END
+      END ;
+
+    MacPtr = POINTER TO MacHeader;
+    MacHeader =
+      RECORD W,H: INTEGER;
+        head: ObjPtr
+      END ;
+
+  VAR firstObj: ObjPtr;
+    deadObj:   ObjPtr;
+    SBuf:      ARRAY [0..SBufSize-1] OF CHAR;
+    tix:       CARDINAL;
+    TObj:      ObjPtr;
+    MaxPerimeter: INTEGER;
+    HeapStart: ADDRESS;
+    pos:       ARRAY [0..63] OF INTEGER;
+    MacTable:  ARRAY [0..1],[40B..177B] OF MacPtr;
+    MacFile:   ARRAY [0..1] OF File;
+ 
+ 
+  PROCEDURE ShowObject(obj: ObjPtr; x0, y0: INTEGER);
+  BEGIN
+    WITH obj^ DO
+      IF kind = line THEN
+        IF mode = selected THEN PaintRectangle(1,x+x0,y+y0,w,h)
+                           ELSE PaintRectangle(0,x+x0,y+y0,w,h)
+        END
+      ELSIF kind IN MacroSetNo THEN
+        IF mode = selected THEN PaintRectangle(2,x+x0,y+y0,w,h)
+        END ;
+        ShowMac(kind,mac,x+x0,y+y0)
+      ELSE
+        WriteString(x+x0, y+y0, kind, SBuf, ix);
+        IF mode = selected THEN PaintRectangle(0,x+x0,y+y0,w,1)
+        END
+      END 
+    END
+  END ShowObject;
+
+  PROCEDURE ShowMac(n,m,x0,y0: INTEGER);
+    VAR obj: ObjPtr;
+  BEGIN obj := MacTable[n-4,m]^.head;
+    WHILE obj # NIL DO
+      IF obj^.mode <= selected THEN
+        ShowObject(obj, x0, y0)
+      END ;                    
+      obj := obj^.next
+    END
+  END ShowMac;
+
+  PROCEDURE ShowSelection(obj: ObjPtr);
+  BEGIN
+    WITH obj^ DO
+      IF kind IN TextFonts THEN
+        PaintRectangle(0,x,y,w,1)
+      ELSIF kind IN MacroSetNo THEN
+        PaintRectangle(2,x,y,w,h); ShowMac(kind,mac,x,y)
+      ELSE
+        PaintRectangle(1,x,y,w,h)
+      END
+    END
+  END ShowSelection;
+
+  PROCEDURE ShowDeselection(obj: ObjPtr);
+  BEGIN
+    WITH obj^ DO mode := on;
+      IF kind IN TextFonts THEN
+        PaintRectangle(3,x,y,w,1)
+      ELSIF kind IN MacroSetNo THEN
+        PaintRectangle(3,x,y,w,h); ShowMac(kind,mac,x,y)
+      ELSE
+        PaintRectangle(0,x,y,w,h)
+      END
+    END
+  END ShowDeselection;
+
+  PROCEDURE NewObj():ObjPtr;
+    VAR obj: ObjPtr;
+  BEGIN
+    IF deadObj = NIL THEN
+      obj := AllocateHeap(TSIZE(Object));
+      obj^.next := firstObj; firstObj := obj
+    ELSE
+      obj := deadObj; deadObj := obj^.dead
+    END ;
+    RETURN obj
+  END NewObj;
+ 
+  PROCEDURE DrawLine;
+    VAR X, Y, dx, dy: INTEGER; obj: ObjPtr;
+  BEGIN obj := NewObj();
+    dx := ABS(x1-x0); dy := ABS(y1-y0);
+    IF dx < dy THEN (*make it vertical*)
+      dx := LineWidth; X := x0;
+      IF y0 < y1 THEN Y := y0 ELSE Y := y1 END
+    ELSE (*make it horizontal*)
+      dy := LineWidth; Y := y0;
+      IF x0 < x1 THEN X := x0 ELSE X := x1 END
+    END ;
+    WITH obj^ DO
+      kind := line; mode := selected;
+      x := X; y := Y; w := dx; h := dy;
+      PaintRectangle(1,x,y,w,h)
+    END ;
+  END DrawLine;
+
+  PROCEDURE MakeString;
+  BEGIN TObj := NewObj();
+    WITH TObj^ DO
+      kind := CurrentFont; mode := selected; ix := tix;
+      x := x1; y := y1; w := 0; h := FontHeight[CurrentFont]
+    END
+  END MakeString;
+
+  PROCEDURE Fill(ch: CHAR);
+    VAR x0, y0: INTEGER;
+  BEGIN
+    WITH TObj^ DO
+      IF tix < ix+64 THEN
+        x0 := x+w; ShowChar(ch, CurrentFont, x0, y);
+        IF x0 > x+w THEN
+          SBuf[tix] := ch; pos[tix-ix] := w; tix := tix + 1;
+          w := x0-x
+        END
+      END
+    END
+  END Fill;
+ 
+  PROCEDURE Backspace;
+    VAR x1: INTEGER;
+  BEGIN
+    WITH TObj^ DO
+      IF tix > ix THEN
+        tix := tix - 1; SBuf[tix] := 0C; x1 := pos[tix-ix];
+        PaintRectangle(3, x+x1, y, w-x1, h); w := x1
+      END
+    END
+  END Backspace;
+ 
+  PROCEDURE CloseString;
+  BEGIN
+    WITH TObj^ DO PaintRectangle(0,x,y,w,1) END ;
+    SBuf[tix] := 0C; INC(tix)
+  END CloseString;
+
+  PROCEDURE ReadMacro(VAR f: File; m,n: CARDINAL): MacPtr;
+    VAR p0,p1: ObjPtr; mp: MacPtr;
+      L,k,t,t0: CARDINAL;
+  BEGIN SetPos(f,0,m*2); ReadWord(f,k);
+    IF k # 0 THEN
+      SetPos(f,0,k*2); ReadWord(f,t); p0 := NIL;
+      WHILE t DIV 4096 < 15 DO
+        p1 := AllocateHeap(TSIZE(Object));
+        WITH p1^ DO
+          x := t MOD 4096; kind := t DIV 4096; mode := on;
+          ReadWord(f,y); ReadWord(f,w); ReadWord(f,h); next := p0;
+          IF kind IN TextFonts THEN
+            ix := tix;
+            REPEAT ReadWord(f,t); t0 := t DIV 256;
+              SBuf[tix] := CHAR(t0); INC(tix);
+              IF t0 # 0 THEN
+                t0 := t MOD 256;
+                SBuf[tix] := CHAR(t0); INC(tix)
+              END
+            UNTIL t0 = 0;
+          ELSIF kind IN MacroSetNo THEN
+            ReadWord(f,t); kind := n+4; mac := t
+          END
+        END ;
+        p0 := p1; ReadWord(f,t)
+      END ;
+      mp := AllocateHeap(TSIZE(MacHeader));
+      WITH mp^ DO
+        ReadWord(f,W); ReadWord(f,H); head := p0
+      END 
+    ELSE mp := NIL
+    END ;
+    RETURN mp
+  END ReadMacro;
+ 
+  PROCEDURE MakeMacro(m,n: CARDINAL);
+    VAR mp: MacPtr; obj: ObjPtr;
+  BEGIN
+    IF (40B < m) & (m < 177B) THEN
+      mp := MacTable[n,m];
+      IF mp = NIL THEN
+        mp := ReadMacro(MacFile[n],m,n); MacTable[n,m] := mp
+      END ;
+      IF mp # NIL THEN
+        obj := NewObj();
+        WITH obj^ DO
+          kind := n+4; mode := selected; mac := m;
+          x := x1; y := y1+1; w := mp^.W; h := mp^.H;
+          PaintRectangle(2,x,y,w,h); ShowMac(kind,mac,x,y)
+        END
+      END
+    END
+  END MakeMacro;
+
+  PROCEDURE Select;
+    VAR obj, selobj: ObjPtr;
+        p, xa, xb, ya, yb: INTEGER;
+  BEGIN obj := firstObj;
+    IF (ABS(x1-x0) < 8) & (ABS(y1-y0) < 8) THEN
+      selobj := NIL; p := MaxPerimeter;
+      WHILE obj # NIL DO
+        WITH obj^ DO
+          IF (mode = on) &
+             (x <= x1) & (x1 <= x+w) & (y <= y1) & (y1 <= y+h) &
+             (w+h < p) THEN p := w+h; selobj := obj
+          END ;
+          obj := next
+        END
+      END ;
+      IF selobj # NIL THEN
+        selobj^.mode := selected; ShowSelection(selobj)
+      END 
+    ELSE (*select objects in area*)
+      IF x0 < x1 THEN xa := x0; xb := x1
+                 ELSE xa := x1; xb := x0
+      END ;                      
+      IF y0 < y1 THEN ya := y0; yb := y1
+                 ELSE ya := y1; yb := y0
+      END ;
+      WHILE obj # NIL DO
+        WITH obj^ DO
+          IF (mode = on) &
+             (xa <= x) & (x+w <= xb) & (ya <= y) & (y+h <= yb) THEN
+             mode := selected; ShowSelection(obj)
+          END ;
+          obj := next
+        END
+      END
+    END
+  END Select;
+
+  PROCEDURE Deselect;
+    VAR obj: ObjPtr;
+  BEGIN obj := firstObj; 
+    WHILE obj # NIL DO
+      WITH obj^ DO
+        IF mode = selected THEN ShowDeselection(obj) END ;
+        obj := next
+      END
+    END
+  END Deselect;
+
+  PROCEDURE Delete;
+    VAR obj: ObjPtr;
+  BEGIN obj := firstObj;
+    WHILE obj # NIL DO
+      WITH obj^ DO
+        IF mode = selected THEN
+          mode := off; PaintRectangle(3,x,y,w,h);
+          dead := deadObj; deadObj := obj
+        END ;
+        obj := next
+      END
+    END
+  END Delete;
+
+  PROCEDURE Move;
+    VAR obj, obj1: ObjPtr; xa,xb,ya,yb,d: INTEGER;
+  BEGIN obj := firstObj; 
+    WHILE obj # NIL DO
+      WITH obj^ DO
+        IF mode = selected THEN
+          PaintRectangle(3,x,y,w,h);
+          IF kind >= 4 THEN
+            obj1 := firstObj;
+            xa := x; xb := x+w; ya := y; yb := y+h;
+            IF x0 = x1 THEN d := y1-y0; (*move vertical*)
+              WHILE obj1 # NIL DO
+                WITH obj1^ DO
+                  IF (mode = on) & (kind = line) & 
+                     (xa <= x) & (x <= xb) & (w < h) THEN
+                    IF (ya <= y) & (y <= yb) THEN
+                      IF d >= 0 THEN PaintRectangle(3,x,y,w,d)
+                                ELSE PaintRectangle(0,x,y+d,w,-d)
+                      END ;
+                      mode := marked; y := y+d; h := h-d
+                    ELSIF (ya <= y+h) & (y+h <= yb) THEN
+                      IF d >= 0 THEN PaintRectangle(0,x,y+h,w,d)
+                                ELSE PaintRectangle(3,x,y+h+d,w,-d)
+                      END ;
+                      mode := marked; h := h+d
+                    END
+                  END ;
+                  obj1 := next
+                END
+              END
+            ELSIF y0 = y1 THEN d := x1-x0; (*move horizontal*)
+              WHILE obj1 # NIL DO
+                WITH obj1^ DO
+                  IF (mode = on) & (kind = line) &
+                     (ya <= y) & (y <= yb) & (h < w) THEN
+                    IF (xa <= x) & (x <= xb) THEN
+                      IF d >= 0 THEN PaintRectangle(3,x,y,d,h)
+                                ELSE PaintRectangle(0,x+d,y,-d,h)
+                      END ;
+                      mode := marked; x := x+d; w := w-d
+                    ELSIF (xa <= x+w) & (x+w <= xb) THEN
+                      IF d >= 0 THEN PaintRectangle(0,x+w,y,d,h)
+                                ELSE PaintRectangle(3,x+w+d,y,-d,h)
+                      END ;
+                      mode := marked; w := w+d
+                    END
+                  END ;
+                  obj1 := next
+                END
+              END
+            END
+          END ;
+        END ;
+        obj := next
+      END
+    END ;
+    obj := firstObj;
+    WHILE obj # NIL DO
+      WITH obj^ DO
+        IF mode = selected THEN
+          x := x + (x1-x0); y := y + (y1-y0);
+          ShowObject(obj,0,0)
+        ELSIF mode = marked THEN
+         mode := on
+        END ;
+        obj := next
+      END
+    END
+  END Move;
+ 
+  PROCEDURE Copy;
+    VAR obj, new: ObjPtr;
+  BEGIN obj := firstObj; 
+    WHILE obj # NIL DO
+      WITH obj^ DO
+        IF mode = selected THEN
+          ShowDeselection(obj); mode := marked
+        END ;
+        obj := next
+      END ;
+    END ;
+    obj := firstObj;
+    WHILE obj # NIL DO
+      WITH obj^ DO
+        IF mode = marked THEN
+          mode := on; new := NewObj();
+          new^.x := x + (x1-x0); new^.y := y + (y1-y0);
+          new^.w := w; new^.h := h;
+          new^.kind := kind; new^.ix := ix;
+          new^.mode := selected; ShowObject(new,0,0)
+        END ;
+        obj := next
+      END
+    END
+  END Copy;
+ 
+  PROCEDURE Input(name: ARRAY OF CHAR; xorg: INTEGER; VAR ok: BOOLEAN);
+    VAR obj: ObjPtr;
+      t0,t1: CARDINAL; in: File;
+  BEGIN Lookup(in, name, FALSE);
+    IF in.res = done THEN
+      ReadWord(in, t0);
+      WHILE NOT in.eof DO
+        obj := NewObj();
+        WITH obj^ DO
+          mode := on; kind := t0 DIV 4096;
+          x := INTEGER(t0 MOD 4096) + xorg;
+          ReadWord(in,y); ReadWord(in,w); ReadWord(in,h);
+          IF kind IN TextFonts THEN ix := tix;
+            REPEAT ReadWord(in,t1); t0 := t1 DIV 256;
+              SBuf[tix] := CHAR(t0); INC(tix);
+              IF t0 > 0 THEN
+                t0 := t1 MOD 256; SBuf[tix] := CHAR(t0); INC(tix)
+              END
+            UNTIL t0 = 0
+          ELSIF kind IN MacroSetNo THEN
+            ReadWord(in,t0); t1 := kind-4; mac := t0;
+            IF MacTable[t1,t0] = NIL THEN
+              MacTable[t1,t0] := ReadMacro(MacFile[t1],t0,t1)
+            END
+          END
+        END ;
+        ShowObject(obj,0,0); ReadWord(in,t0)
+      END ;
+      Close(in); ok := TRUE
+    ELSE ok := FALSE
+    END
+  END Input;
+ 
+  PROCEDURE Output(name: ARRAY OF CHAR; xorg: INTEGER; VAR ok: BOOLEAN);
+    CONST ylim = 832;
+    VAR obj: ObjPtr;
+      i,t0,t1: CARDINAL; xlim: INTEGER;
+      out: File;
+  BEGIN Lookup(out, name, TRUE); xlim := xorg + 640;
+    IF out.res = done THEN
+      obj := firstObj;
+      WHILE obj # NIL DO
+        WITH obj^ DO
+          IF (mode <= selected) & (w > 0) & (h > 0) &
+            (x >= xorg) & (x+w <= xlim) & (y >= 0) & (y+h <= ylim)
+          THEN
+            WriteWord(out, kind*4096 + (CARDINAL(x - xorg)));
+            WriteWord(out,y);
+            WriteWord(out,w); WriteWord(out,h);
+            IF kind IN TextFonts THEN i := ix;
+              REPEAT t0 := CARDINAL(SBuf[i]); INC(i);
+                IF t0 > 0 THEN
+                  t1 := CARDINAL(SBuf[i]); INC(i)
+                  ELSE t1 := 0
+                END ;
+                WriteWord(out, t0*256+t1)
+              UNTIL t1 = 0
+            ELSIF kind IN MacroSetNo THEN
+              WriteWord(out, mac)
+            END ;
+          END ;
+          obj := next
+        END
+      END ;
+      Close(out); ok := TRUE
+    ELSE ok := FALSE
+    END
+  END Output; 
+ 
+  PROCEDURE Rebuild;
+    VAR obj: ObjPtr;
+  BEGIN ClearMap; obj := firstObj;
+    WHILE obj # NIL DO
+      IF obj^.mode <= selected THEN
+        ShowObject(obj,0,0)
+      END ;
+      obj := obj^.next
+    END
+  END Rebuild;
+
+  PROCEDURE OpenMacro(n: CARDINAL; name: ARRAY OF CHAR; VAR ok: BOOLEAN);
+  BEGIN
+    Lookup(MacFile[n], name, FALSE);
+    IF MacFile[n].res # done THEN ok := FALSE END
+  END OpenMacro;
+
+  PROCEDURE CloseMacro(n: CARDINAL);
+  BEGIN Close(MacFile[n])
+  END CloseMacro;
+
+  PROCEDURE Restart(reduce: BOOLEAN);
+    VAR HeapEnd: ADDRESS; i: CARDINAL;
+  BEGIN
+    IF reduce THEN
+      HeapEnd := AllocateHeap(0);
+      HeapEnd := DeallocateHeap(HeapStart - HeapEnd)
+    ELSE HeapStart := AllocateHeap(0)
+    END ;
+    firstObj := NIL; deadObj := NIL;
+    FOR i := 40B TO 177B DO
+      MacTable[0,i] := NIL; MacTable[1,i] := NIL
+    END ;
+    tix := 0; MaxPerimeter := 32767; ClearMap
+  END Restart;
+
+END SilObjects.

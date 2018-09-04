@@ -1,0 +1,94 @@
+DEFINITION MODULE EditInput; (* vs I.11             Werner Winiger 25.2.83
+                  =========  *)
+
+  EXPORT QUALIFIED
+    BusyRead, ReadCh, ReadAgain, ReadMouse, ReadKey, Wait0Button,
+    pendingMsg, ButtonProc, WatchButtons, ReadString, ReadOct,
+    ReadFileName, InitEditInput;
+
+
+  TYPE
+    ButtonProc = PROCEDURE (CARDINAL);
+
+  VAR
+    pendingMsg: BOOLEAN;
+
+
+  PROCEDURE BusyRead (VAR ch: CHAR); (*
+ 
+    transparent reading of the keyboard *)
+
+
+  PROCEDURE ReadCh (VAR ch: CHAR); (*
+ 
+    in the replay mode a character from the transcript is read,
+    else "Read" is called until a key is encountered;
+    writes a copy of ch to the transcript *)
+
+
+  PROCEDURE ReadMouse (VAR mb: CARDINAL); (*
+ 
+    reads in the replay mode a button, "area", ("command", 
+    "Mline" and "Mcol" if possible) from the transcript
+    else calls "ReadMB" until a button is pressed;
+    writes a copy of "mb", "area", ... to the transcript *)
+
+
+  PROCEDURE ReadKey (VAR ch: CHAR; VAR button: CARDINAL);  (*
+
+    reads in the replay mode the next character/button from
+    the transcript (with possibly side effects on "area",...;
+    else calls "Read" and "ReadMB" alternatively until
+    either of them returns a nonzero value; if ch = 0c then 
+    button = the mousebutton; waits until the button
+    is released and copies the then encountered values
+    to the transcript *)
+
+
+  PROCEDURE ReadAgain; (*
+
+    puts the last character read back to where it came from
+    and makes it available to another "ReadCh" / "ReadKey" *)
+
+
+  PROCEDURE Wait0Button (p: PROC); (*
+
+    reads in the replay case "Mline" and "Mcol" from the transcript
+    else loops calling procedure "p" until no more button is pressed;
+    writes then the mouseposition "Mline", "Mcol" to the transcript *)
+
+
+  PROCEDURE WatchButtons (p: ButtonProc); (*
+
+    loops calling procedure "p" with the buttons currently pressed as
+    parameter until no more button is pressed;
+    writes the different buttons and the mouseposition "Mline", "Mcol"
+    to the transcript *)
+
+
+  PROCEDURE ReadString (VAR s: ARRAY OF CHAR; VAR l: CARDINAL); (*
+
+    reads a string and echos it in the message area;
+    the replay case is treated accordingly *)
+
+
+  PROCEDURE ReadOct (VAR ch: CHAR; VAR ok: BOOLEAN); (*
+
+    reads an octal number and echos it in the message area; returns the
+    character with the given ordinal number or NOT ok, if escape was
+    pressed; the replay case is treated accordingly *)
+
+
+  PROCEDURE ReadFileName (VAR fn: ARRAY OF CHAR; VAR termCh: CHAR;
+                          dfn,inp: ARRAY OF CHAR; inputLength: CARDINAL);
+                                                                        (*
+    reads a file name using procedure ReadFileName from module FileNames.
+    Uses input/output procedures assigned to TerminalBase to control the
+    i/o behaviour of the library module. Especially: the string 'inp'
+    is fed first to the reading procedure. *)
+
+
+  PROCEDURE InitEditInput; (* initializes the module *)
+
+
+END EditInput.

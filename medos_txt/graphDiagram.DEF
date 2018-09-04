@@ -1,0 +1,23 @@
+DEFINITION MODULE graphDiagram;
+
+  (* Copyright: DISER AG *)
+  (* Author: Leo Geissmann, DISER Zurich *)
+  (* Version: 1 *)
+  (* Date: 83.09.02 *)
+  (* Purpose: Handling of data for graph diagrams *)
+
+  EXPORT QUALIFIED
+    NewDiagram, AddDiagramData, PaintDiagram;
+
+  PROCEDURE NewDiagram(
+              title : ARRAY OF CHAR; (* title of diagram *)
+              ok : BOOLEAN); (* initialization successful *)
+
+  PROCEDURE AddDiagramData(
+              value : REAL; (* value of represented data *)
+              legend : ARRAY OF CHAR; (* legend to value *)
+              pattern : CARDINAL); (* number of pattern in diagram *)
+
+  PROCEDURE PaintDiagram;
+
+END graphDiagram.

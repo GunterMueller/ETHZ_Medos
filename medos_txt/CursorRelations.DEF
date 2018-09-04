@@ -1,0 +1,18 @@
+DEFINITION MODULE CursorRelations;  (* Ch. Jacobi*)
+  FROM WindowHandler IMPORT Window;
+  EXPORT QUALIFIED
+    Inside,
+    DownCharPos, RightCharPos,
+    UpDotPos, RightDotPos;
+  (* all coordinates are relative to the position in CursorStuff 
+     for procedures different from Inside: if the coordinates show outside 
+       of the window results are undefined, the procedures may even trap;
+     The window is assumed initialized *)
+ 
+  PROCEDURE Inside(w: Window): BOOLEAN;
+  PROCEDURE DownCharPos(w: Window): CARDINAL;
+  PROCEDURE RightCharPos(w: Window): CARDINAL;
+  PROCEDURE UpDotPos(w: Window): CARDINAL;
+  PROCEDURE RightDotPos(w: Window): CARDINAL;
+
+END CursorRelations.

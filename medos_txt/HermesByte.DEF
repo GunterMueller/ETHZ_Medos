@@ -1,0 +1,22 @@
+DEFINITION MODULE HermesByte; (* WW 8.6.83 from JH hermes 3/5/82 *)
+
+FROM SYSTEM IMPORT
+  WORD;
+FROM FileSystem IMPORT
+  Response;
+
+EXPORT QUALIFIED
+  TimeOut, TimeOutOn, SendByte, ReceiveByte, TimeOutLength;
+
+VAR
+  TimeOut : BOOLEAN; (* FALSE => a byte has been received,
+                        TRUE  => time out *)
+  TimeOutOn : BOOLEAN; (* TRUE => activate time out *)
+
+PROCEDURE SendByte (b: CHAR);
+
+PROCEDURE ReceiveByte (VAR b: CHAR);
+
+PROCEDURE TimeOutLength (length: CARDINAL);
+
+END HermesByte.

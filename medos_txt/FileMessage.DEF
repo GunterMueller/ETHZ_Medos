@@ -1,0 +1,27 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          FileMessage                 *
+*                                      *
+*          Version 2   4.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE FileMessage;
+
+  FROM FileSystem IMPORT Response;
+
+  EXPORT QUALIFIED WriteResponse;
+
+  PROCEDURE WriteResponse(r: Response);
+
+END FileMessage.

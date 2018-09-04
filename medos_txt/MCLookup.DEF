@@ -1,0 +1,49 @@
+(****************************************
+*                                       *
+*     MODULA-2 Multi-Pass Compiler      *
+*     ****************************      *
+*                                       *
+*     Implementation for Lilith         *
+*                                       *
+*                                       *
+*     MCLookup:                         *
+*                                       *
+*     Lookup on files according to      *
+*     different searching strategies    *
+*                                       *
+*     Version C19 of 23.07.82           *
+*                                       *
+*     Institut fuer Informatik          *
+*     ETH-Zuerich                       *
+*     CH-8092 Zuerich                   *
+*                                       *
+****************************************)
+
+DEFINITION MODULE MCLookup;        (* LG *)
+
+  FROM CompFile IMPORT File;
+
+  EXPORT QUALIFIED LookupFile;
+
+  PROCEDURE LookupFile(prompt: ARRAY OF CHAR;
+                       name: ARRAY OF CHAR;
+                       defext: ARRAY OF CHAR;
+                       VAR file: File;
+                       query, acceptdefault, acceptoptions: BOOLEAN;
+                       VAR acceptedfilename: ARRAY OF CHAR;
+                       VAR goodfile: BOOLEAN);
+
+    (* for implementation the modules FileNames, *)
+    (* Options and CompFile are imported       *)
+
+    (* prompt        : string is displayed on terminal *)
+    (* name          : for construction of a default file name *)
+    (* defext        : default extension of searched file *)
+    (* file          : opened file *)
+    (* query         : explicit asking for file name *)
+    (* acceptdefault : accept a default file name *)
+    (* acceptoptions : accept options appended to file name *)
+    (*                 options are not evaluated *)
+    (* goodfile      : lookup was successful *)
+
+END MCLookup.

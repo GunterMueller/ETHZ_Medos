@@ -1,0 +1,23 @@
+DEFINITION MODULE EditFonts; (* vs I.11              Werner Winiger 8.2.82
+                  =========  *)
+
+  FROM Screen IMPORT Font;
+
+  EXPORT QUALIFIED
+    charSize, lineSize, menuCharSize, menuLineSize,
+    editFont, defaultFont, controlCharsAvailable, LoadFonts;
+
+  VAR
+    charSize,
+    lineSize,
+    menuCharSize,
+    menuLineSize: CARDINAL;
+
+    controlCharsAvailable: BOOLEAN;
+
+    editFont,
+    defaultFont: Font;
+
+  PROCEDURE LoadFonts (VAR name: ARRAY OF CHAR);
+
+END EditFonts.

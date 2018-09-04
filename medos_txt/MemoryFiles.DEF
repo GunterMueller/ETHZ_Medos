@@ -1,0 +1,18 @@
+(**********************************************
+*                                             *
+*          MemoryFiles                        *
+*                                             *
+*                                             *
+*          by S. Grossen                      *
+*                                             *
+*          created on             10.4.1981   *
+*                                             *
+*                                             *
+*                                             *
+**********************************************)
+
+DEFINITION MODULE MemoryFiles;
+
+(* no export list because of the only export are the prcedures
+   FileCommand and DirectoryCommand via procedure variables  *)
+END MemoryFiles.

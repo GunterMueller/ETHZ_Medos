@@ -1,0 +1,1 @@
+DEFINITION MODULE SilInput;  (*NW 23.1.83*)  EXPORT QUALIFIED    ReadKey,    com, com1, x0, x1, y0, y1,    LineWidth, CurrentFont, Grid, Umlaut, FontMenu;  VAR com, com1: CARDINAL;      x0, x1, y0, y1, LineWidth: INTEGER;      CurrentFont, Grid: CARDINAL;      Umlaut: BOOLEAN;      FontMenu: ARRAY [0..31] OF CHAR;  PROCEDURE ReadKey;  (*get next key*)END SilInput.

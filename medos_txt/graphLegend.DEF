@@ -1,0 +1,24 @@
+DEFINITION MODULE graphLegend;
+
+  (* Copyright: DISER AG *)
+  (* Author: Leo Geissmann, DISER Zurich *)
+  (* Version: 1 *)
+  (* Date: 83.09.02 *)
+  (* Purpose: Painting of a legend in a window *)
+
+  FROM WindowHandler IMPORT
+    Window;
+
+  EXPORT QUALIFIED
+    InitLegend,    (* initialization of legend painting *)
+    NextLegend;    (* painting of next legend *)
+
+  PROCEDURE InitLegend(
+              wind : Window; (* where the legend must be painted *)
+              x, y, w, h : CARDINAL); (* block of legend area *)
+
+  PROCEDURE NextLegend(
+              legend : ARRAY OF CHAR; (* legend text *)
+              patnum : CARDINAL); (* pattern number *)
+
+END graphLegend.

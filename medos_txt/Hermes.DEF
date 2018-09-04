@@ -1,0 +1,13 @@
+DEFINITION MODULE Hermes; (* WW 9.6.83 from JH hermes 3/5/82 *)
+
+FROM FileSystem IMPORT File;
+FROM HermesLine IMPORT FileName;
+
+EXPORT QUALIFIED
+  InitConnection, XferFile;
+
+PROCEDURE InitConnection (VAR ok: BOOLEAN);
+ 
+PROCEDURE XferFile (from: FileName; VAR to: File; VAR ok: BOOLEAN);
+
+END Hermes.

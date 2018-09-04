@@ -1,0 +1,1 @@
+DEFINITION MODULE MDWhatToDebug; (* Ch. Jacobi *)  EXPORT QUALIFIED debuglife;  VAR debuglife: BOOLEAN;END MDWhatToDebug.

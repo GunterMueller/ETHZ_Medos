@@ -1,0 +1,174 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          ByteBlockIO:                *
+*                                      *
+*          File i/o routines for       *
+*          - blocks (ARRAY OF WORD) &  *
+*          - byteareas (addr, count)   *
+*                                      *
+*          Version 2  12.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+IMPLEMENTATION MODULE ByteBlockIO;
+ 
+  FROM FileSystem IMPORT
+    File, Response, Flag, FlagSet, 
+    SetRead, SetWrite, Doio;
+
+  FROM SYSTEM IMPORT WORD, ADDRESS, ADR;
+
+
+  PROCEDURE SetResponse(VAR f: File; resp: Response);
+  BEGIN 
+    WITH f DO 
+      res := resp;
+      IF resp <> done THEN  
+        eof := TRUE; 
+        flags := flags + FlagSet{er, ef} 
+      END
+    END   
+  END SetResponse;
+
+  PROCEDURE MoveBytes(toaddr: ADDRESS; toix: CARDINAL;
+                     fromaddr: ADDRESS; fromix: CARDINAL;
+                     count: CARDINAL);
+
+    CONST
+      LXB = 205B;
+      SXB = 225B;
+      MOV = 340B;
+
+    VAR wcnt: CARDINAL;
+ 
+    PROCEDURE MoveWords(toaddr, fromaddr: ADDRESS; count: CARDINAL);
+    CODE
+      MOV;
+    END MoveWords;
+
+    PROCEDURE MoveByte(toaddr: ADDRESS; toix: CARDINAL;
+                       fromaddr: ADDRESS; fromix: CARDINAL);
+    CODE
+      LXB; SXB;
+    END MoveByte;
+
+  BEGIN
+    WHILE count > 0 DO
+      IF ODD(toix) <> ODD(fromix) THEN
+        REPEAT
+          MoveByte(toaddr, toix, fromaddr, fromix);
+          INC(toix); INC(fromix); DEC(count);
+        UNTIL count = 0;
+      ELSIF ODD(toix) OR (count = 1) THEN
+          MoveByte(toaddr, toix, fromaddr, fromix);
+          INC(toix); INC(fromix); DEC(count);
+      ELSE
+        wcnt := count DIV 2;
+        MoveWords(toaddr + toix DIV 2, fromaddr + fromix DIV 2, wcnt);
+        INC(toaddr, wcnt); INC(fromaddr, wcnt); DEC(count, 2*wcnt);
+      END;
+    END;
+  END MoveBytes;
+
+  PROCEDURE ReadBytes(VAR f: File; addr: ADDRESS; count: CARDINAL;
+                      VAR actualcount: CARDINAL);
+
+    VAR cnt: CARDINAL;
+
+  BEGIN
+    actualcount := 0;
+    WITH f DO    
+      LOOP
+        IF count = 0 THEN EXIT END; 
+        IF flags*FlagSet{rd,bytemode,ag,ef}<>FlagSet{rd,bytemode} THEN
+          IF NOT (rd IN flags) THEN
+            IF wr IN flags THEN
+              SetResponse(f, callerror);
+            ELSE SetRead(f);  
+              INCL(flags, bytemode);
+            END
+          END;
+          IF eof THEN EXIT END;
+          INCL(flags, bytemode);
+          IF ag IN flags THEN
+            IF elodd THEN elodd := FALSE
+            ELSE DEC(ela); elodd := TRUE
+            END;
+            EXCL(flags, ag);
+          END
+        ELSIF (ela < ina) OR (ela = ina) AND (elodd < inodd) THEN
+          cnt := 2 * (ina - ela) + CARDINAL(inodd) - CARDINAL(elodd);
+          IF cnt > count THEN cnt := count END;
+          MoveBytes(addr, actualcount, ela, CARDINAL(elodd), cnt);
+          INC(actualcount, cnt); DEC(count, cnt);
+          INC(ela, cnt DIV 2);
+          IF ODD(cnt) THEN
+            IF elodd THEN INC(ela) END;
+            elodd := NOT elodd;
+          END;
+        ELSE
+          Doio(f); 
+        END
+      END (* loop *)  
+    END
+  END ReadBytes;
+
+
+  PROCEDURE ReadByteBlock(VAR f: File; VAR b: ARRAY OF WORD);
+    VAR acnt: CARDINAL;
+  BEGIN
+    ReadBytes(f, ADR(b), 2*(HIGH(b)+1), acnt);
+  END ReadByteBlock;
+
+  
+  PROCEDURE WriteBytes(VAR f: File; addr: ADDRESS; count: CARDINAL);
+
+    VAR actualcount, cnt: CARDINAL;
+
+  BEGIN
+    actualcount := 0;
+    WITH f DO
+      LOOP
+        IF count = 0 THEN EXIT END; 
+        IF flags*FlagSet{wr,bytemode,er} <> FlagSet{wr,bytemode} THEN 
+          IF NOT (wr IN flags) THEN
+            IF rd IN flags THEN SetResponse(f, callerror); 
+            ELSE SetWrite(f); INCL(flags, bytemode);
+            END;
+          END;
+          IF er IN flags THEN EXIT END; 
+          INCL(flags, bytemode);
+        ELSIF ela >= topa THEN Doio(f)  
+        ELSE 
+          cnt := 2 * (topa - ela) - CARDINAL(elodd);
+          IF cnt > count THEN cnt := count END;
+          MoveBytes(ela, CARDINAL(elodd), addr, actualcount, cnt);
+          INC(actualcount, cnt); DEC(count, cnt);
+          INC(ela, cnt DIV 2);
+          IF ODD(cnt) THEN
+            IF elodd THEN INC(ela) END;
+            elodd := NOT elodd;
+          END;
+        END 
+      END (* loop *)   
+    END
+  END WriteBytes;
+
+
+  PROCEDURE WriteByteBlock(VAR f: File; VAR b: ARRAY OF WORD);
+  BEGIN
+    WriteBytes(f, ADR(b), 2*(HIGH(b)+1))
+  END WriteByteBlock;
+
+END ByteBlockIO.
+

@@ -1,0 +1,1 @@
+DEFINITION MODULE MDMapView;  (* Ch.J, HK. B 10.11.81*)  EXPORT QUALIFIED InitMapView, TerminateMapView;  PROCEDURE InitMapView;  PROCEDURE TerminateMapView;   END MDMapView.

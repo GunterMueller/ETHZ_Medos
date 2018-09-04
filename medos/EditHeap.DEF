@@ -1,0 +1,1 @@
+DEFINITION MODULE EditHeap; (* vs I.11              Werner Winiger 9.11.80                  ========  *)  FROM SYSTEM IMPORT ADDRESS;   EXPORT QUALIFIED ALLOCATE, InitEditHeap;   PROCEDURE ALLOCATE (VAR p: ADDRESS; psize: CARDINAL);  PROCEDURE InitEditHeap;END EditHeap.

@@ -1,0 +1,394 @@
+A c
+13.  Hardware Problems and Maintenance
+C Y15 c
+Jirka Hoppe  19.5.82
+B Y20
+13.1.  What to Do if You Assume some Hardware Problems
++
+There is one significant difference between software and hardware.
+ A piece of software
+keeps the same quality, if left untouched, a piece of hardware will die sooner or later
+(the mean time between failure for the HB D120 disk drives was estimated to be about 5000 hours).  For this reason you must expect at any time a hardware failure of your system.
+ Any user can influence the reliability of Lilith by observing some basic rules:
+
+21/0 The computer must be cooled properly so that the inner temperature never exceeds
+40 degrees Celsius.  Keep therefore the bottom of the computer (entry of the air flow)
+uncovered.  Place your computer so that there will be a minimal distance between
+the 'fan side' of the computer (exit of the air flow) and the next wall of at least 
+15 cm.  Adjust your air conditioning to a lower temperature.
+
+22/0 The disk cartridges are extremely sensitive to dust.  Keep your cartridges always
+in a plastic bag, avoid any dirt and wipe the bottom of your cartridge before inserting
+it into the drive.  Leave your cartridge in the drive, avoid unnecessary removing. 
+ Put always a dummy grey cartridge into the drive when you remove the disk cartridge.
+ The dummy cartridge protects your drive from dust. 
+
+The hardware problems may be classified into four groups:
+n x25
+a/ it is impossible to boot the computer
+b/ one peripheral device (mouse, network,..) does not work
+c/ everything 'works' but unreliable
+d/ computer works, but there are some problems with your disk
+a x0
+If you have some troubles of the class a/ or b/ please check that all connectors
+(power, keyboard, mouse, display, network) are plugged in correctly
+and that all control lights on the computer cabinet (red for power and white for a "not" active disk)
+and on the keyboard (keys 2ON LINE0 and 2FORMAT0 ) are on.
+
+There is a possibility that the boot file on your disk is damaged.  Put your disk into
+another Lilith and try a bootstrap.  If the bootstrap is still not successful, check your disk using
+the 1DiskCheck0 program (load 1DiskCheck0 from another disk and exchange cartridges when the program is waiting for input) and get a new boot file.
+
+If everything seems to be all right but you have still problems => call the maintenance group.
+ If you have any problems where you believe it may be caused by an unreliable hardware,
+please check first your software before you start any panic action.
+
+Your system disk contains a hardware test program 1SYS.HardwareTest0
+that tests thoroughly the processor and the main memory.
+ You should run this program not only if you assume some hardware problems but always when you drink coffee or whisky on the rocks instead of working.
+ The command file 1SEK.Idle.COM0 will be executed if you leave the computer
+idle for more than 3 minutes.
+ Put the command 1SYS.HardwareTest0 on this file and the hardware will be tested regularly.
+ If the test program runs for a long time without giving a single error message,
+there is a great chance that the hardware is OK.
+ If the test program displays error messages, please note them and call the maintenance group.
+
+If you assume that not the processor but any peripheral device
+is causing reliability problems, call the  maintenance group.
+ They have a collection of test programs for all devices.
+
+1Generally:0 handle your computer like you handle your girl (or boy) friend.
+ Don't kick it, don't use a hammer, don't spill your coffee into the processor, etc.
+ Please talk to the computer tenderly and pet him.
+p B
+13.2.  DiskCheck
++
+If you have any problems with your disk cartridge, run program 1DiskCheck0.
+ It checks the directory and possibly all sectors of your disk.
+ The program asks you if you would like to try any fixes.
+ Answer with 2Y0 if you want.
+ If you try any fixes, the program will ask you if you would like to confirm them.
+ Answer always with 2Y0 unless you have a large number of damaged sectors.
+ There will be some errors that you cannot fix using program 1DiskCheck0.
+ In this case find somebody who knows how to use the 1DiskPatch0 program.
++ w15
+There are the following possible error messages:
+= x25
+- disk error on sect = 1nnnnn7 1xxxxx7
+  file name = 1yyyyy7
++ x50 n Y2
+nnnnn is the sector number
+xxxxx is a further description of the error( e.g. time out, parity err, ..)
+yyyyy is the name of the file that contains this sector
++ x50
+A hardware error occured during the read or write operation.
+ The program asks you if you want to fix it, 
+answer with 'Y' unless the sector belongs to the 'FS.Directory' file;
+for the 'FS.Directory' file => call DiskPatch
+= x25
+- bad fno = 1nnnnn7 on sector 1mmmmm7
++ x50 Y2
+=> call DiskPatch
+= x25
+- wrong page pointer, dir sector 1nnnnn7, pointer 1mmmmm7
+  file name = 1yyyyy7
++ x50 Y2
+try to delete yyyyy and immediately bootstrap, if not successful => call DiskPatch
+= x25
+- double allocated page, page = 1nnnnn7, dir entries 1mmmmm7 1ooooo7
+  file name = 1yyyyy7  file name = 1zzzzz7
++ x50 Y2
+delete yyyyy and zzzzz and immediately bootstrap
+= x25
+- bad pointer: name->block directory, sector = 1nnnnn7
++ x50 Y2
+=> call DiskPatch
+= x25
+- name dir points to a free block, name dir sect = 1nnnnn7,
+  block dir sect = 1mmmmm7  file name = 1yyyyy7
++ x50 Y2
+try to delete yyyyy and immediately bootstrap, if not successful => call DiskPatch
+= x25
+- version # conflict, name dir sect = 1nnnnn7, version = 1mmmmm7,
+  block dir sect = 1ooooo7, version = 1ppppp7
+  file name = 1yyyyy7
++ x50 Y2
+=> call DiskPatch
++ w15
+After the program has checked the directory, it asks whether you would like to check all sectors
+on hardware errors.  Answer with 2Y0 if you want.
+
+If you made any fixes on your disk, bootstrap the computer and run program DiskCheck again
+to be sure that your disk is all right now.
+p B
+13.3.  DiskPatch
++
+Jirka Hoppe  14.5.82
+
+af2
+Warning: The program DiskPatch should be used by professional users only.
+ You can destroy by a few key strokes the entire disk and there will
+be no possibility
+to recover this disaster.  If you are not completely sure how to use this program =>
+keep hands off.
+C Y15
+13.3.1.  Introduction
++
+The program DiskPatch allows you to initiate disk cartridges for D120 and D140 Honeywell Bull drives and to recover from some
+crashes of either the file system or the hardware.  All actions to fix a disk are done manually and the user must know the structure of the file system.
+
+After DiskPatch is started, a greeting message is displayed on the screen and you are asked whether you know how to use this program.  Answer with 2Y0 if you are a professional user.
+ (If you type anything else than  2Y0 the program will stop!!!).
+ Next, you are asked to exchange the current disk for the disk you would like to fix.
+ If the current disk should be fixed, switch the white disk-ready-button off and back on.
+ Next, the program asks you, whether you are definitly sure that it is the right disk.
+ Check again the cartridge number and answer with 2Y0 if everything is ok.
+ Now a set of commands is available.  You may get the menu by typing '?'.
+ Every command is activated by typing a key character from the menu.
+ The octal representation is used for all numbers .   
+C Y15
+13.3.2.  Commands
++
+2B   bad block link0
+x25 a Y2
+This command is used to insert a damaged sector into a 'FS.BadPages' file.  Type the sector number in octal.
+
+In case of problems there may be the following error messages:
+x50
+7problems...not done0 => hardware problems when reading or writing directory
+
+7too many bad blocks0 => the BadPages file is already full
+
+7already linked0 => the sector is already inserted in the BadPages file
++
+2C   character dump0
+x25 Y2
+The last read sector is displayed in ASCII characters.  Nonprintable characters
+are displayed as '.'
++
+2D   disk switch; removable/fixed0
+x25 Y2
+This command may be used only for the D140 disk.  It switches the cartridges used for
+next commands.  First the type of the current disk is displayed.  Next you can change the disk.  Type 'r' if the next operations should be performed on the Removable cartridge, type 'f'
+if the fixed disk should be used.
++
+2G   get file to sector0
+x25 Y2
+This command finds a name of a file containing a specified data sector.  If the sector is not in use a message 1not allocated0 is displayed.
++
+2F   find name0
+x25 Y2
+This command finds an internal file number of specified file name.  Type the full file name, ( you may use 2DEL0) and close the string by 2RETURN0.  If the file is found, the internal file number is displayed, if the file does not exists, 7not found0 is displayed.
++
+2I   inspect0
+x25 Y2
+The last read sector may be inspected and changed in a octal representation.
+ Type the address and the content of the specified word will be displayed.
+ Now you may type ':' to enter the change mode and to specify the new value.
+ By typing ',' the next address will be displayed, typing any other key will terminate
+the inspect command.
++
+2K   consistency check0
+x25 Y2
+The constistency of the directory is checked.
+For detailed information see the description of the 1DiskCheck0 program.
++
+2L   illegal block build up0
+x25 Y2
+This command is used to write and to read the entire disk and to find damaged sectors
+and situations, where more than one invalid sector is located on a single track.
+ Such sectors will be inserted later into the FS.BadPages file using the 'S' command.
+ (After you have run the 'Z' command: no problems, the program will help you.)
+ The execution of the 'L' command takes about 15 minutes.  At the end a statistic about
+your disk is displayed.
+ It contains the number of single bad sectors (they will be handled
+by the disk driver so that you will not notice any difference), and  their position if they are located within the fixed files.  The same information is displayed for 1double bad sectors0 (see above).  If there are some 1double bad sectors0 located in fixed files you may not use
+this disk cartridge at all!!!.  When in doubt consult some specialist.
+
+2WARNING: THIS COMMAND DESTROYS THE ENTIRE DISK INFORMATION!!!!0
++
+2N   name directory update0
+x25 Y2
+This command is used to inspect and change the name directory and has 5 subcommands. 
+ Type 'ESC' to get back to the main menue:
+x50
+1display0   The current directory sector is displayed.
+ Such a sector contains 8 file entries (0..7).  Each entry consists of: 
+x75
+1name0 -  24 characters; left adjusted, right filled with 2BLANKs0,
+
+1kind0 - (0=> file is not in use, 1=> file is used),
+
+1file number0 - acting  as a pointer to the 'block directory',
+
+1version number0 - which must be the same as the version number in the block directory
+
+The number in parentheses gives the address of the information, that may be used by the
+inspect command.
+x50
+1read sector0
+  This procedure reads a name directory sector that will be used for next operations.
+ You may either type a sector number or '=' to get the same sector again or ',' to get the next sector.
+
+1inspect0
+  The same as Inspect from the main menu.
+
+1name change0
+  The name entry will be changed by this command.  The procedure asks you for the index
+of the name (0..7), displays the old name and asks for the new name.  The name input is closed by 2RETURN0.
+
+1write sector0
+  The sector is written back onto the disk.  You may either type a sector number or '=' to write to the same sector as read.
+ The program asks you to confirm the sector number.  Type 'y' if you agree that this sector should be written.
++
+2O   octal dump0
+x25 Y2
+The current sector (opened by the 2R0 command) will be displayed in octal mode.
++
+2R   read sector0
+x25 Y2
+This command reads a disk sector that will be used for next operations.
+ You may either type a sector number or  '=' to get the same sector again or  ',' to get the next sector.
++
+2S   set illegal blocks into directory0
+x25 Y2
+The information as computed by the 'L' command is inserted into the file FS.BadPages.
+ If no double illegal blocks were found by the 'L' command, a message 7no double illegal blocks0 is displayed.
++
+2T   transfer0
+x25 Y2
+This procedure is used on D140 disk drives only to transfer a number of sectors between two disks.
+ You first have to specify the source disk. Type 'f' for fixed disk or 'r' for removable disk.
+ Now specify in octal numbers the low and high limit of the region to be transferred.
+
+2WARNING:  If you would like to transfer the entire disk and the target disk contains any bad blocks (see 'L' command) you will destroy the BadPages file and you may run into troubles!!0
++
+2U   update directory0
+x25 Y2
+This command is used to inspect and change the block directory and has 4 subcommands;
+Type 'ESC' to get back to the main menue:
+
+x50
+1display0  The current block directory sector is displayed.
+
+There is the following relevant information being displayed.
+x75
+1file#0 - is the internal index of the file; it 2must0 be the same as the relative sector 
+number in the directory
+
+1version Nr0 - version number of the file, it 2must0 be the same as the version number
+of the same file in the name directory
+
+1kind0 - 0 => file is free;  1=> file is in use
+
+1length.block0 - how many page blocks are used
+
+1length.byte0 - number of bytes in the last used page
+
+1page table0 - pointers to data sectors. Data sectors are assigned in blocks
+of 8 sectors. To compute the physical address make the following computation
+
+   physical.address := (page DIV 13) * 8        decimal
+
+   physical.address := (page DIV 15) * 10       octal
+
+A pointer to an unused page has a value 167340 (octal).
+
+The number in parentheses of each identifier of the display command gives the address of the information, that may be used by the
+inspect command.
+
+x50
+1read sector0
+  This command reads a directory sector that will be used for next operations.
+ You may either type a sector number or '=' to get the same sector again or ',' to get the next sector.
+
+1inspect0
+  The same as Inspect from the main menu
+
+1write sector0
+  The sector is written back on the disk.  You may either type a sector number or '=' to write to the same sector as read.
+ The programs asks you to confirm the sector number.  Type 'y' if you agree that this sector should be written.
++
+2W   write sector0
+x25 Y2
+The sector is written back on the disk.  You may either type a sector number or '=' to write to the same sector as read.
+ The program asks you to confirm the sector number.  Type 'y' if you agree that this sector should be written.
++
+2Z   zero directory0
+x25 Y2
+The directory is initialized.
+
+2WARNING:  THIS COMMAND DESTROYS THE ENTIRE DISK INFORMATION!!!!0
++
+2+   octal calculator0
+x25 Y2
+This is a simple calculator able to add, subtract, multiply and divide two octal numbers.
+ Type 2ESC0 to exit to the main menu.
+C Y15
+13.3.3.  How to Initialize a New Cartridge
++
+Each cartridge must be initialized in order to find damaged sectors or situations where more than one illegal block is encountered on a single track.
+
+To initialize a cartridge perform the following steps:
+x25
+Run the 'L' command
+
+Run the 'Z' command
+
+If the 'L' command displays any 7double bad blocks0 run the 'S' command.
+x0
+Record the 1bad block0 information in a log book in order to have an overview of 
+your cartridges.
+ If there are some 'double bad sectors' located in fixed files you may not use
+this disk cartridge at all!!!.  When in doubt consult some specialists.
+C Y15
+13.3.4.  The most Frequent Problems with Your Disk
++
+The following section gives you an overview of the most frequent problems with
+your disk and gives proposals how to fix them.
+ Some of these problems will be encountered during the bootstrap sequence, where the file 
+system refuses to complete the bootstrap, since the directory is out of order; 
+some other problems will be detected either by the 1K consistency0 command or the 1DiskCheck0
+program.
+
+Most problems can be solved, when the damaged file is entirely removed by setting
+the 1kind0 field of the damaged file in both directories (name and block) to 200.
+ This is however a rather brutal, but simple method.
+C Y15
+It is Impossible to Boot the Machine
++
+There is message on the screen
+=
+DiskSystem.FileCommand: bad directory entry: fno= 1nnnn7; read fno = 1mmmm7
++
+Solution: read the directory sector nnnn using the commands 'U' (update directory) and 'R'; correct the file number (address 1) to the value nnnn and write the sector back using the 'W' command'.
+ Find the name of the corresponding file by entering the 'N' (name directory) command and reading the sector nnnn DIV 10 (octal).  The file name will be found on the position nnnn MOD 10 (octal).
+ This file may contain garbage.  Boot the system and check this file.
+w15
+There is message on the screen
+=
+DiskSystem.OpenVolume:bad page pointer; fno = 1nnnn7, pageno = 1mmmm7, page = 1oooo7
++
+Solution: All page pointers must be dividable by 15 (octal).  Enter 'U'(update directory)
+command, read the sector nnnn and check the pointer mmmm using the '+' (calculator).
+ Replace the bad pointer by the NIL value 167340 (octal).
+ If too many pointers are damaged, read another directory sector, change the file number,
+set length to zero, put all page pointers to NIL and write the sector on nnnn.
+
+Find the name of the file as described above and check the file for garbage.
+C Y15
+Problems Found by Program DiskCheck or Command Consistency:
++
+1double allocated page0
+
+A single page belongs to two files.  Delete both files and immediately bootstrap!!!!
+w15
+1name dir points to free block, name dir sect=nnnn0
+
+Enter the 'N' (name directory) command; read the sector nnnn DIV 10 (octal), and set the 1kind0 of the file on the position nnnn MOD 10 (octal) to zero.  Write the sector back.
+w15
+1version# conflict0
+
+The version number of a file in the 1name0 and 1block0 directory must be the same.
+ Change one version number so that they match.
+

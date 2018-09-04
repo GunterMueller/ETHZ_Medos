@@ -1,0 +1,99 @@
+(********************************
+*                               * 
+*    WindowDialogue             *
+*    **************             *
+*                               *
+*    Version 2   14.12.81       *
+*                               *
+*    Christian Jacobi           * 
+*    Institut fuer Informatik   *
+*    ETH-Zuerich                *
+*    CH-8092 Zuerich            *
+*                               *
+********************************) 
+
+DEFINITION MODULE WindowDialogue;  (* Ch. Jacobi 14.12.81*)
+
+  FROM WindowHandler IMPORT
+    Window, WindowSignal, SignalSet, WindowProc;
+  EXPORT QUALIFIED
+    DialogProc, 
+    InstallWindow, CreateInstallWindow, RemoveWindow,
+    InstallKeyboard,
+    DialogLoop, EndLoop;
+
+
+  (* 
+     procedures to install "handler's" which are called on specific
+     actions done with or inside a window;
+     [the handlers are only called if the action is caused from within this module]
+
+
+    DialogActions: 
+       1 - left   button pressed inside the window
+       2 - middle    "      "       "    "    "
+       3 - right     "      "       "    "    "
+       4 - commandinterpreter called inside the window
+             (executing programs elsewhere is not recorded)
+       5 - remove command interactively called 
+
+      15 - enables dialog actions caused from higher, non shared levels
+  *)
+
+
+  TYPE DialogProc = PROCEDURE(Window, CARDINAL);
+
+
+  PROCEDURE InstallWindow(w: Window; 
+              dialogActions: BITSET;            (*interactive allowed dialog actions*)
+              dialogHandler: DialogProc;        (*called on dialog actions*)
+              windowHandlerActions: SignalSet;  (*interactive allowed WH actions*)
+              VAR done: BOOLEAN);
+
+
+  PROCEDURE CreateInstallWindow(VAR w: Window; name: ARRAY OF CHAR;
+              dialogActions: BITSET;            (*interactive allowed dialog actions*)
+              dialogHandler: DialogProc;        (*called on dialog actions*)
+              windowHandlerActions: SignalSet;  (*interactive allowed WH actions*)
+              savebitwise: BOOLEAN;             (*WindowHandler*)
+              signal: WindowProc;               (*WindowHandler; called on WH action*)
+              VAR done: BOOLEAN);
+    (* corresponds to :
+          interactive position query; CreateWindow; InstallWindow
+    *)
+
+
+      (* 
+         dialogActions:        interactive allowance by this module
+         windowHandlerActions: INTERACTIVE allowance by this module;
+                               (if called explicitely all actions are allowed
+                                since the Windowhandler ignores this module)
+         dialogHandler:        handler called on all dialog actions
+         signal:               handler called on all WindowHandler actions;
+                               (don't care about interaction or not)
+                               for exact definition see WindowHandler
+
+         savebitwise:          the WindowHandler saves the image on overlapping
+                               for exact definition see WindowHandler
+      *)
+
+  PROCEDURE RemoveWindow(w: Window);
+    (*does not close the window*)
+
+
+  PROCEDURE InstallKeyboard(p: PROC);
+    
+
+  PROCEDURE DialogLoop(comint: BOOLEAN);
+    (* starts a main loop which calls the installed handler procedures
+       according to the interactive actions of the user.
+       it may be stopped interactively or 
+       programmed by calling EndLoop;
+       comint: allows calling the command interpreter interactively*)              
+
+  PROCEDURE EndLoop;
+    (* stops the dialogue loop *)
+
+END WindowDialogue.
+
+

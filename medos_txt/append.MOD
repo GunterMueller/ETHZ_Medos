@@ -1,0 +1,110 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          Program Append:             *
+*                                      *
+*          Append appends by copying   *
+*          one file to another file.   *
+*                                      *
+*          Version 2  15.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+MODULE Append;
+
+  FROM SYSTEM IMPORT
+    WORD, ADR;
+
+  FROM Terminal IMPORT
+    Read, ReadAgain, Write, WriteString, WriteLn;
+
+  FROM FileSystem IMPORT
+    File, Response,
+    Lookup, Close,
+    SetOpen, SetRead, SetWrite,
+    SetPos, Length;
+
+  FROM FileMessage IMPORT
+    WriteResponse;
+
+  FROM FileNames IMPORT
+    ReadFileName;
+
+  FROM ByteBlockIO IMPORT
+    ReadBytes, WriteBytes;
+
+
+  CONST
+    eol = 36C;
+    buflength = 1024 * 12;
+    fnlength = 32;
+
+  TYPE
+    FileName = ARRAY [0..fnlength-1] OF CHAR;
+
+  VAR
+    ch: CHAR;
+    tofile, fromfile: File;
+    tofn, fromfn: FileName;
+    ok: BOOLEAN;
+    highpos, lowpos: CARDINAL;
+    buf: ARRAY [0..buflength-1] OF WORD;
+    readbytes: CARDINAL;
+
+BEGIN
+  WriteString(' Append from > ');
+  ReadFileName(fromfn, 'DK');
+  Read(ch);
+  IF ch = eol THEN WriteLn END;
+  IF fromfn[0] = 0C THEN
+    WriteString('  no file')
+  ELSE
+    Lookup(fromfile, fromfn, FALSE);
+    IF fromfile.res = done THEN
+      WriteString('  to > ');
+      ReadFileName(tofn, fromfn);
+      Read(ch);
+      IF ch = eol THEN WriteLn END;
+      IF tofn[0] = 0C THEN
+        WriteString('  no file')
+      ELSE
+        Lookup(tofile, tofn, TRUE);
+        IF tofile.res = done THEN
+          IF tofile.new THEN WriteString('  -- new file --  ') END;
+          Length(tofile, highpos, lowpos);
+          SetPos(tofile, highpos, lowpos);
+          SetRead(fromfile); SetWrite(tofile);
+          IF (fromfile.res=done) AND (tofile.res=done) THEN
+            REPEAT
+              ReadBytes(fromfile, ADR(buf), 2*buflength, readbytes);
+              WriteBytes(tofile, ADR(buf), readbytes);
+            UNTIL fromfile.eof;
+            SetOpen(tofile); SetOpen(fromfile);
+          END;
+          IF tofile.res = done THEN
+            WriteResponse(fromfile.res)
+          ELSE
+            WriteResponse(tofile.res)
+          END;
+          Close(tofile);
+        ELSE
+          WriteResponse(tofile.res);
+        END;
+      END; 
+      Close(fromfile);
+    ELSE
+      WriteResponse(fromfile.res)
+    END;
+  END;
+  WriteLn;
+END Append.
+

@@ -1,0 +1,56 @@
+(***************************************
+*                                      *
+*          M E D O S - 2               *
+*          *************               *
+*                                      *
+*                                      *
+*          ByteBlockIO:                *
+*                                      *
+*          File i/o routines for       *
+*          - blocks (ARRAY OF WORD) &  *
+*          - byteareas (addr, count)   *
+*                                      *
+*          Version 2   9.10.80         *    
+*                                      *
+*                                      *
+*          Svend Erik Knudsen          *
+*          Institut fuer Informatik    *
+*          ETH-Zuerich                 *
+*          CH-8092 Zuerich             *
+*                                      *
+***************************************)
+
+DEFINITION MODULE ByteBlockIO;
+ 
+  FROM FileSystem IMPORT File;
+  FROM SYSTEM IMPORT WORD, ADDRESS;
+
+
+  EXPORT QUALIFIED
+    ReadByteBlock, WriteByteBlock,
+    ReadBytes, WriteBytes;
+
+  PROCEDURE ReadByteBlock(VAR f: File; VAR block: ARRAY OF WORD);
+
+  PROCEDURE WriteByteBlock(VAR f: File; VAR block: ARRAY OF WORD);
+
+  
+  PROCEDURE ReadBytes(VAR f: File; addr: ADDRESS; count: CARDINAL;
+                     VAR actualcount: CARDINAL);
+
+  PROCEDURE WriteBytes(VAR f: File; addr: ADDRESS; count: CARDINAL);
+
+END ByteBlockIO.
+
+
+  (* ReadByteBlock and WriteByteBlock transfer the given block 
+     (ARRAY OF WORD) to or from the file f. The bytes are trans-
+     fered analog to ReadBytes and WriteBytes.
+
+     ReadBytes and WriteBytes transfer the given area (beginning 
+     at address addr and with (count+1) DIV 2 words) to or from 
+     the file f. The number of transfered bytes is returned in 
+     actualcount. ReadBytes and WriteBytes transfer two bytes to
+     or from each word. If (actual-)count is odd, only one byte
+     (the upper one) is transfered to or from the last word.
+                                                                *)

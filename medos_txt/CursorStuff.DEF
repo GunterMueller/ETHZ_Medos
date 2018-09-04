@@ -1,0 +1,67 @@
+DEFINITION MODULE CursorStuff;  (* Ch. Jacobi *)
+  EXPORT QUALIFIED
+    MenuSelection, TrackCursor, ReleaseCursor, xpos, ypos,
+    buttons, GetMouse,
+    InstallCursor, ArrowInvert, SimpleMove;
+
+
+  (* high level features *)
+
+  VAR xpos, ypos: CARDINAL;
+
+  PROCEDURE MenuSelection(s: ARRAY OF CHAR): CARDINAL;
+     (* The menu is painted near to the position (xpos, ypos).
+        s: max 9 commands
+           "  title|comm-2|comm-3| ... |comm-n"        OR     
+           "* title|comm-2|comm-3| ... |comm-n"       (waits first)      
+        the "*" is used when no button was pressed previously.   
+        returns:
+        0:  not selected:
+                a key on the keyboard has been pressed.  The key 
+                pressed is put back into the input buffer and 
+                can be read with Terminal.Read;
+        1:    not selected:
+                tried to select title or outside the menu;
+        2..n: the corresponding command has been selected  *)
+     *)
+
+
+  PROCEDURE TrackCursor(): CARDINAL;
+    (*returns 0: keyboard 1: left button; 2: middle; 3: right; *)
+    (*does cursor tracking; returns when the first button (or key) 
+      is pressed while cursor tracking *)
+
+  PROCEDURE ReleaseCursor(wait: BOOLEAN; VAR but: BITSET);
+    (* {1}: left button; {2}: middle; {3}: right; {0}: keyboard *)
+    (* wait: if wait is set and no button is pressed at initialization
+             time, then 
+               ReleaseCursor does cursor tracking till any button
+               is pressed, then continues cursor tracking and returns when 
+               all buttons are released. 
+               (but returns as soon a key is pressed)
+             else 
+               does cursor tracking; returns when all buttons are 
+               released (or a key is pressed) 
+    *)   
+
+
+  (* lower level features *)
+
+  VAR buttons: CARDINAL;
+ 
+  PROCEDURE GetMouse;
+    (* reads the mouse status; sets xpos, ypos, buttons *)
+
+  PROCEDURE InstallCursor(invertproc, moveproc: PROC);
+    (* the next call of TrackCursor or ReleaseCursor uses invertproc to draw
+       and to erase the cursor; moveproc to move the cursor *)
+
+  PROCEDURE ArrowInvert;
+
+  PROCEDURE SimpleMove;
+    (* does the move through inverting twice *)
+
+END CursorStuff.
+
+
+

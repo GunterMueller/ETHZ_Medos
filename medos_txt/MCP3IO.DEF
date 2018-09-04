@@ -1,0 +1,70 @@
+(****************************************
+*                                       *
+*     MODULA-2 Multi-Pass Compiler      *
+*     ****************************      *
+*                                       *
+*     Implementation for Lilith         *
+*                                       *
+*                                       *
+*     MCP3IO:                           *
+*                                       * 
+*     input / output handling in Pass 3 *
+*                                       * 
+*     Version C19 of 20.04.82           *
+*                                       *
+*     Institut fuer Informatik          *
+*     ETH-Zuerich                       *
+*     CH-8092 Zuerich                   *
+*                                       *
+****************************************)
+
+DEFINITION MODULE MCP3IO;    (* LG *)
+
+  FROM SYSTEM IMPORT WORD;
+  FROM MCBase IMPORT Idptr, Symbol, Spellix;
+
+  EXPORT QUALIFIED
+    sy, val, length, spix, nptr,
+    PutSy, PutWord,
+    Savepos, InitSave, ResetSave, ReleaseSave,
+    Error, ErrorLS,
+    GetSy, PutGetSy,
+    TermInOut;
+
+  TYPE Savepos;
+
+  VAR sy : Symbol;
+      val : CARDINAL;    (* value *)
+      length : CARDINAL; (* string length *)
+      spix : Spellix;    (* spelling index of identifier *)
+      nptr : Idptr;      (* pointer to referenced name *)
+
+  PROCEDURE PutSy(s: Symbol);
+    (* put symbol s and pos on il1 file *)
+
+  PROCEDURE PutWord(w: WORD);
+    (* put word w on il1 file *)
+
+  PROCEDURE InitSave(VAR s: Savepos);
+
+  PROCEDURE ResetSave(s: Savepos);
+
+  PROCEDURE ReleaseSave(s: Savepos);
+
+  PROCEDURE Error(n: CARDINAL);
+    (* put error number n to current symbol *)
+
+  PROCEDURE ErrorLS(n: CARDINAL);
+    (* put error number n to last symbol *)
+
+  PROCEDURE GetSy;
+    (* get next symbol from il2 file *)
+    (* symbol is assigned to sy      *)
+
+  PROCEDURE PutGetSy;
+    (* put last symbol sy, get next symbol sy *)
+
+  PROCEDURE TermInOut;
+    (* termination of il1 and il2 *)
+
+END MCP3IO.

@@ -1,0 +1,223 @@
+IMPLEMENTATION MODULE MDUtility;  (*Carl Binding; modified CJ 3.6.81
+                                    redesigned by P. K. *)
+  (*$T-*) (*$R-*)
+
+  FROM SYSTEM IMPORT WORD;
+  FROM WindowHandler IMPORT
+    Window, WriteChar, SetPos, GetPos, Mode, FreeChars, FreeLines,
+    Clear, ClearLines, BlockDescriptor, Replicate;
+  FROM Terminal IMPORT Read, BusyRead;
+  FROM OutWindow IMPORT Write;
+
+  CONST EOL = 36C;
+
+  VAR c1: ARRAY [0..5] OF REAL;
+      c2: ARRAY [2..8] OF REAL;
+      (*real constants c1[i]:= 10^(2^i), c2[i]:= 0.5*10^(-i)*) 
+  VAR black: RECORD size1, pat177777B: CARDINAL END;
+
+
+PROCEDURE Same(a1, a2: ARRAY OF CHAR): BOOLEAN;
+(*compares two arrays of char*)
+  VAR i, high: CARDINAL; res: BOOLEAN;
+BEGIN
+ IF HIGH(a1) < HIGH(a2) THEN
+   high:= HIGH(a1)
+ ELSE 
+   high:= HIGH(a2)
+ END; 
+ res:= TRUE;
+ FOR i:= 0 TO HIGH(a1) DO
+   IF a1[i] <> a2[i] THEN res:= FALSE END;
+   IF (a1[i] = 0C) OR (a2[i] = 0C) THEN RETURN(res) END;
+ END;
+ RETURN(res)
+END Same;
+
+    VAR FlipLineBlock: BlockDescriptor;
+
+  PROCEDURE PaintFlipLine(w: Window);
+  BEGIN
+    FlipLineBlock.h := w^.innerblk.h;
+    Replicate(w, FlipLineBlock, replace, black); 
+  END PaintFlipLine;
+
+  PROCEDURE ResetWindow (w: Window);
+  BEGIN
+    Clear(w);
+    PaintFlipLine(w)
+  END ResetWindow;
+
+
+  PROCEDURE ResetLowWindow(w: Window; line, pos: CARDINAL);
+    VAR x, y: CARDINAL;
+  BEGIN
+    SetPos(w, line, pos);
+    ClearLines(w, FreeLines(w));
+    PaintFlipLine(w);
+  END ResetLowWindow;
+
+  PROCEDURE DisplayHex(wor: WORD; w: Window);
+    VAR card, d, i: CARDINAL;
+  BEGIN Write(w, ' '); d:= 1000H; card:= CARDINAL(wor);
+    REPEAT
+      i:= card DIV d MOD 10H;
+      IF (i >= 0) AND (i <=9) THEN Write(w, CHAR(i+CARDINAL('0')))
+      ELSE Write(w, CHAR(i-0AH+CARDINAL('A'))) END;
+      d:= d DIV 10H
+    UNTIL d= 0;
+  END DisplayHex;
+
+  PROCEDURE Space(n: CARDINAL; w: Window);
+  BEGIN
+    FOR n := 1 TO n DO
+      Write(w, " ")
+    END
+  END Space;
+
+
+  PROCEDURE DisplayIdent(id: ARRAY OF CHAR; len: CARDINAL; w: Window);
+    VAR i: CARDINAL; ch: CHAR; 
+  BEGIN i := 0; 
+    LOOP
+      IF i>=len THEN EXIT END;
+      IF i<=HIGH(id) THEN ch := id[i] ELSE ch := 0C END;
+      IF ch=0C THEN Space(len - i, w); EXIT
+      ELSE Write(w, ch); INC(i)
+      END
+    END
+  END DisplayIdent;
+
+
+  PROCEDURE R(H, L:CARDINAL): REAL;
+  CODE (*null*)
+  END R;
+
+
+PROCEDURE DisplayReal(x: REAL; n: CARDINAL; w: Window);
+  (*to write a real value into w*)
+  VAR e, m: CARDINAL;
+      i: INTEGER;
+      x0: RECORD
+            CASE CARDINAL OF
+              0: R: REAL |
+              1: H, L: CARDINAL
+            END
+          END;
+      
+  PROCEDURE ten(e: CARDINAL): REAL;
+  (*to compute 10^e*)
+    VAR i: CARDINAL; t: REAL;
+  BEGIN 
+    i:= 0; t:= 1.0;
+    WHILE e > 0 DO
+      IF e MOD 2 <> 0 THEN t:= c1[i] * t END;
+      INC(i); e:= e DIV 2
+    END;
+    RETURN t
+  END ten;
+
+  PROCEDURE fix(x: REAL; bias: CARDINAL): REAL;
+    CODE 237B; 3
+  END fix;
+
+  PROCEDURE double(x: REAL): REAL;
+    CODE 216B
+  END double;
+
+  PROCEDURE sum(x, y: REAL): REAL;
+    CODE 210B
+  END sum;
+
+  PROCEDURE mul10(x: REAL): REAL;
+  BEGIN
+    RETURN double(sum(double(double(x)), x))
+  END mul10;
+
+BEGIN
+  IF x = 0.0 THEN
+    REPEAT Write(w, " "); DEC(n) UNTIL n <= 1;
+    Write(w, "0")
+  ELSE
+    IF n <= 9 THEN n := 3 ELSE n := n-6 END ;
+    REPEAT Write(w, " "); DEC(n) UNTIL n <= 8;
+    (*there are 1 < n <= 8 digits to be written*)
+    IF x < 0.0 THEN Write(w, "-"); x := -x ELSE Write(w, " ") END ;
+    x0.R := x; e := x0.H DIV 200B;
+    IF e > 200B THEN  (*x >= 1.0*)
+      e := (e-200B)*77 DIV 400B; x := x/ten(e); i := e;
+      IF x >= 1.0 THEN
+        x := R(37314B,146314B)*x; INC(i)
+      END
+    ELSE
+      e := (200B-e)*77 DIV 400B; x := x*ten(e); i := -INTEGER(e);
+      IF x < 0.1 THEN
+        x := 10.0 *x; DEC(i)
+      END
+    END ;
+    x := x + c2[n];  (*round*)
+    IF x >= 1.0 THEN
+      x := R(37314B,146315B)*x; INC(i)
+    END ;
+    (* 0.1 <= x < 1.0 *)
+    x0.R := mul10(fix(x, 40000B)); DEC(i);
+    m := x0.H DIV 400B; x0.H := x0.H MOD 400B;
+    Write(w, CHAR(m+60B)); Write(w, "."); DEC(n);
+    REPEAT x0.R := mul10(x0.R);
+      m := x0.H DIV 400B; x0.H := x0.H MOD 400B;
+      Write(w, CHAR(m+60B)); DEC(n)
+    UNTIL n = 0;
+    Write(w, "E");
+    IF i < 0 THEN Write(w, "-"); i := -i
+             ELSE Write(w, "+")
+    END ;
+    Write(w, CHAR(i DIV 10 + 60B)); Write(w, CHAR(i MOD 10 + 60B))
+  END
+END DisplayReal;
+
+
+PROCEDURE DisplayByte(wor: WORD; w: Window);
+  VAR i, d, card, lbyte, hbyte: CARDINAL;
+BEGIN card := CARDINAL(wor); hbyte := card DIV 400B; lbyte := card MOD 400B;
+  Write(w, ' '); d:= 100B;
+  REPEAT 
+    i := hbyte DIV d MOD 10B;
+    Write(w, CHAR(i+CARDINAL('0')));
+    d := d DIV 10B
+  UNTIL d=0;
+  Write(w, ' '); d:= 100B;
+  REPEAT
+    i := lbyte DIV d MOD 10B;
+    Write(w, CHAR(i+CARDINAL('0')));
+    d := d DIV 10B
+  UNTIL d=0;
+END DisplayByte;
+
+
+PROCEDURE DisplayChar(wor: WORD; w: Window);
+  VAR card, hbyte, lbyte: CARDINAL;
+BEGIN card:= CARDINAL(wor);
+  hbyte := card DIV 400B; lbyte := card MOD 400B;
+  Write(w, ' ');
+  IF (hbyte < 40B) OR (hbyte > 177B) THEN Write(w, '.')
+  ELSE Write(w, CHAR(hbyte)) END;
+  IF (lbyte < 40B) OR (lbyte > 177B) THEN Write(w, '.')
+  ELSE Write(w, CHAR(lbyte)) END;
+END DisplayChar;
+
+
+BEGIN
+  black.size1 := 1;
+  black.pat177777B := 177777B;
+  c1[0] := R(41040B,     0 ); c2[2] := R(36243B,153412B);
+  c1[1] := R(41710B,     0 ); c2[3] := R(35403B, 11156B);
+  c1[2] := R(43434B, 40000B); c2[4] := R(34521B,133427B);
+  c1[3] := R(46676B,136040B); c2[5] := R(33647B,142654B);
+  c1[4] := R(55416B, 15712B); c2[6] := R(33006B, 33675B);
+  c1[5] := R(72635B,142656B); c2[7] := R(32200B,     0 ); c2[8] := 0.0;
+
+    FlipLineBlock.x := 15;
+    FlipLineBlock.y := 0;
+    FlipLineBlock.w := 1;
+
+END MDUtility.

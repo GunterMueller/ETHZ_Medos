@@ -1,0 +1,144 @@
+IMPLEMENTATION MODULE UpdateDirInput; (* WW 27.6.83 *)
+
+FROM Terminal IMPORT
+  Write, WriteString, WriteLn;
+FROM String IMPORT
+  Insert, first, last;
+FROM FileSystem IMPORT
+  File, Response, Create, Close, Reset, ReadChar;
+FROM Monitor IMPORT
+  Time;
+FROM UpdateTimeIO IMPORT
+  ReadTime, WriteTime;
+FROM UpdateProfileIO IMPORT
+  GetDirectoryName, GetDirectoryTime;
+FROM Hermes IMPORT
+  XferFile;
+FROM HermesLine IMPORT
+  FileName;
+
+CONST
+  EOL = 36c;
+
+VAR
+  previousDate,
+  lastDate: Time;
+  ok: BOOLEAN;
+
+  dir: File;
+  dirCh: CHAR;
+
+PROCEDURE ReadFromDir (VAR ch: CHAR);
+BEGIN
+  ReadChar(dir,ch);
+  dirCh := ch;
+END ReadFromDir;
+
+
+PROCEDURE OpenDirectory (d: CARDINAL; VAR entry: DirEntry; VAR ok: BOOLEAN);
+VAR
+  name: FileName;
+  eof: BOOLEAN;
+BEGIN
+  Create(dir,"DK");
+  IF dir.res <> done THEN
+    WriteString(" ---- temporary file for directory not created");
+    WriteLn;
+    ok := FALSE;
+    RETURN;
+  END;
+  GetDirectoryName(d,name);
+  Insert(name,first,"DK.");
+  WriteString(" getting directory ");
+  XferFile(name,dir,ok); (* better diagnose ! *)
+  IF NOT ok THEN
+    WriteString(" ---- ");
+    WriteString(name);
+    WriteString(" not transferred");
+    WriteLn;
+    RETURN;
+  END;
+  GetDirectoryTime(d,lastDate);
+  FindDate(lastDate,entry,eof);
+  IF eof THEN
+    WriteString(" ---- no files released on this directory since ");
+    WriteTime(lastDate,Write,0c);
+    ok := FALSE;
+  END;
+  WriteLn;
+END OpenDirectory;
+
+
+PROCEDURE Greater (d1,d2: Time): BOOLEAN; (* returns d1 > d2 *)
+BEGIN
+  WITH d1 DO
+    IF day > d2.day THEN RETURN TRUE;
+    ELSIF day = d2.day THEN
+      IF minute > d2.minute THEN RETURN TRUE;
+      ELSIF minute = d2.minute THEN
+        RETURN millisecond > d2.millisecond;
+      ELSE RETURN FALSE;
+      END;  
+    ELSE RETURN FALSE;
+    END;
+  END;
+END Greater;
+
+
+PROCEDURE GetNextEntry (VAR entry: DirEntry; VAR eof: BOOLEAN);
+VAR i: CARDINAL;
+BEGIN
+  WITH entry DO
+    WHILE (dirCh = ' ') OR (dirCh = EOL) DO
+      ReadChar(dir,dirCh);
+      IF dir.eof THEN
+        eof := TRUE;
+        RETURN;
+      END;
+    END;
+    ReadTime(date,ok,dirCh,ReadFromDir);
+    IF NOT ok THEN HALT; END; (* illegal date on directory *)
+    WHILE dirCh = ' ' DO ReadChar(dir,dirCh); END;
+    i := 0;
+    REPEAT
+      name[i] := dirCh;
+      INC(i);
+      ReadChar(dir,dirCh);
+    UNTIL dirCh = ' ';
+    IF i < 32 THEN name[i] := 0c; END;
+    WHILE dirCh = ' ' DO ReadChar(dir,dirCh); END;
+    IF CAP(dirCh) = 'D' THEN code := toDelete;
+    ELSIF CAP(dirCh) = 'C' THEN code := toCopy;
+    ELSE HALT; (* illegal code on directory *)
+    END;
+    REPEAT ReadChar(dir,dirCh); UNTIL dirCh = EOL;
+    IF Greater(date,previousDate) THEN previousDate := date;
+    ELSE HALT; (* dates on directory not ordered *)
+    END;
+  END;
+  eof := FALSE;
+END GetNextEntry;
+
+
+PROCEDURE FindDate (date: Time; VAR entry: DirEntry; VAR eof: BOOLEAN);
+BEGIN
+  WITH previousDate DO
+    day := 0;
+    minute := 0;
+    millisecond := 0;
+  END;
+  Reset(dir);
+  ReadFromDir(dirCh);
+  REPEAT
+    GetNextEntry(entry,eof);
+  UNTIL eof OR Greater(entry.date, date);
+END FindDate;
+
+
+PROCEDURE CloseDirectory;
+BEGIN
+  Close(dir);
+END CloseDirectory;
+
+
+END UpdateDirInput.

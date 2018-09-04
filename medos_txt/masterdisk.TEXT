@@ -1,0 +1,599 @@
+c f7
+DISER
+w30 A c
+Description of the Software-Release Version 4.2.1
+(Source Variant)
+w20 c f2
+LG/ChJ/SEK/WW 25.06.82;   WW 83/07/08
+B
+Table of Contents
++ n
+C.  Compiler
+D.  Debugger
+L.  Library Modules
+U.  Utility Programs
+M.  Medos-2
+S.  Screen Software
+E.  Editor
+I.  Micro Code
+T.  Hardware Tests
+X.  Additional Programs and Files
+XXTH.  HandBook
+B
+Abbreviations of File Extensions
++ t80 130.
+M  MOD  (Implementation) module source file.
+D  DEF  Definition module source file.
+O  OBJ  Object code file of a module or a program.
+S  SYM  Symbol file of a separate module.
+A  ABS  Absolute code file, for bootstrap.
+C  COM  Command file.
+F  SCF  Font file of a screen font.
+P  PRF  Font file of a printer font.
+W  WID  Width file of a printer font.
+T  TXT  Text file for documentation.
+X  MIC  Others, like uCode, Pascal, or Apple-assembler source.
+B
+Abbreviations regarding Documentation
++ t80 130.
+H    Included in the handbook.
+h    Included in the handbook but should be updated.
++    There is some documentation available.
+-    No documentation available.
+B
+C.  Compiler
+C
+C.1.  Compiler Program
++ t200 215 230 245 270 295.
+modula           O    H  Compiler base.
+C19.Init         O      Initialization.
+C19.Pass1        O      Pass1.
+C19.Pass2        O      Pass2.
+C19.Pass3        O      Pass3.
+C19.Pass4        O      Pass4.
+C19.Symfile      O      Symbol file generator.
+C19.Lister       O      Listing file genrator.
+ -------------------
+ 8 files
+C
+C.2.  Compiler Modules
++ n
+MCBase         M  D        Common data structures.
+MCPublic       M  D        Call of compiler passes.
+
+MCInit         M           Compiler initialization.
+MCLookup       M  D        Lookup of compiler files.
+
+MCP1Main       M           Syntax analysis.
+MCP1IO         M  D        Input/output and scanner.
+MCP1Ident      M  D        Identifier handling.
+MCP1Reals      M  D        Real number evaluation.
+MCSymFileDefs  M  D        Symbol file definitions.
+
+MCP2Main       M           Declaration analysis.
+MCP2IO         M  D        Input/output and scanner.
+MCP2Ident      M  D        Identifier handling.
+MCP2Reference  M  D        Reference file generator.
+MCOperations   M  D        Constant expression arithmetic.
+
+MCP3Main       M           Body analysis.
+MCP3IO         M  D        Input/output and scanner.
+MCP3Ident      M  D        Identifier handling.
+
+MCP4Main       M           M-code generation.
+MCMnemonics    M  D        Mnemonic numbers.
+MCP4Global     M  D        Input/output and scanner.
+MCP4CodeSys    M  D        Code output.
+MCP4AttributSys  M  D        Attribute handling.
+MCP4CallSys    M  D        Code generation for procedure calls.
+MCP4ExpressionSy(s)  M  D        Code generation for expressions.
+
+MCSymFile      M           Symbol file generator.
+
+MCLister       M           Listing file generator.
+ -------------------
+ 45 files
+C
+C.3.  Library Modules Used by the Compiler
++ n
+MemoryFiles    M  D      ?  Handler of memory resident files.
+WriteStrings   M  D      ?  Terminal output.
+CompFile       M  D      ?  File handling.
+ -------------------
+ 6 files
+C
+C.4.  Decoder
++ n
+decode            M     O     H  Object code file decoder.
+DecoStatistic     M  D           Used by decoder; for statistics.
+DecoMachineDef    M  D           Used by decoder; defines mnemonics.
+Decoder                    C     Commandfile to compile the decoder.
+ -------------------
+ 7 files
+C
+C.5.  Command Files for Compiler Bootstrap
++n
+MClib                   C    Compilation of compiler library modules.
+MCdef                   C    Compilation of compiler definition modules.
+MCmod                   C    Compilation of compiler implementation modules.
+MClink                  C    Linking of the compiler programs.
+MCinstall               C    Installation of the new compiler.
+ -------------------
+ 5 files
+B
+D. Debugger
++ n
+debug                   O     H  Debugger main program.
+MDMain            M              
+MDDataView        M  D        
+MDDataHandler     M  D        
+MDScreenView      M  D        
+MDProcView        M  D        
+MDProcHandler     M  D        
+MDProcessView     M  D        
+MDRefFileHandler  M  D        
+MDFileControl     M  D        
+DumpFileHandler   M  D        
+MDWhatToDebug     M  D     S   (Do not recompile DEF; SYM must be compatible
+                               with Help).
+Inspect           M  D        
+MDModuleHandler   M  D        
+MDMapView         M  D        
+MDDialogView      M  D        
+MDUtility         M  D        
+MDListView        M  D        
+MDmod                      C   Commandfile to compile, link, and install the debugger.
+ -------------------
+ 36 files
+B
+L.  Library Modules
++ n
+ByteIO       M  D  O  S  H  File input/output of bytes.
+ByteBlockIO  M  D  O  S  H  File input/output of byte blocks.
+FileNames    M  D  O  S  H  File name scanner.
+V24          M  D  O  S  H  
+Line         M  D  O  S  H  
+Options      M  D  O  S  H  Program option scanner.
+Conversions  M  D  O  S  -  Number to string conversion.
+NameSearch   M  D  O  S  -  Search of name entries in directory.
+OutTerminal  M  D  O  S  H  Formatted output to the Terminal. 
+OutFile      M  D  O  S  H  Formatted output to Files.
+OutWindow    M  D  O  S  H  Formatted output to Windows.
+InOut        M  D  O  S  H  
+RealInOut    M  D  O  S  H  
+Mouse        M  D  O  S  H  
+LineDrawing  M  D  O  S  H  
+MathLib0     M  D  O  S  H   
+Help         M  D  O  S  -   
+String       M  D  O  S  H   
+ReadUserProfile  M  D  O  S  -  
+Library        C    Commandfile to compile and install the library modules.
+ -------------------
+ 77 files
+B
+U.  Utility Programs
++ n
+directory    M    O    H  File directory inspection.
+delete       M    O    H  Delete files on disk.
+protect      M    O    H  Protect files on disk.
+unprotect    M    O    H  Unprotect files on disk.
+copy         M    O    H  Copy files on disk.
+rename       M    O    H  Rename files on disk.
+list         M    O    H  List a file on the display.
+commandfile  M    O    H  Initialization of command files.
+boot         M    O    H  Boot from regular boot file.
+altboot      M    O    H  Boot from alternate boot file.
+xref         M    O    H  Cross reference file generator.
+inspect      M    O    H  Inspection of file contents.
+hpcopy       M    O    H  Backup/Restore to Hewlett Packard 26XY cassettes.
+hermes       M    O    H  File transfer program.
+memfilexfer       O    -  File transfer program for a single machine.
+applecopy    M    O    H  Backup and restore to/from Apple floppy diskette.
+APCOP.TEXT           X    Apple-Pascal partner for applecopy.
+BACKASM.TEXT         X    Assembler routines for APCOP.
+Utilities            C    
+develop      M    O     +  Development of programs.
+clock             O     -  Set the system time.
+update       M    O     +  Update a disk from a master copy.
+UpdateDirInput   M  D        Modules of the program update.
+UpdateProfileIO  M  D        
+UpdateTimeIO     M  D        
+UpdateStringIO   M  D        
+Hermes           M  D        
+HermesByte       M  D        
+HermesLine       M  D        
+Obj.Medos.REL            X    Release directories describing the object master.
+Obj.Editors.REL          X    
+Obj.Libraries.REL        X    
+Obj.Utilities.REL        X    
+Obj.Modula.REL           X    
+Obj.Misc.REL             X    
+Obj.Demo.REL             X    
+Obj.Fonts.REL            X    
+ -------------------
+ 61 files
+B
+M.  Medos-2 Operating System
+C
+M.1.  Medos-2 Modules
++ n
+SEK               M  D  A  S  H  Main program of resident part.
+Terminal          M  D    S  H  
+TerminalBase      M  D    S  +  
+DisplayDriver     M  D    S  -  
+DefaultFont       M  D    S  -  
+FileSystem        M  D    S  H  
+DiskSystem        M  D    S  -  
+D140Disk          M  D    S  -  
+Program           M  D    S  H  
+Frames            M  D    S  +  
+Monitor           M  D    S  -  
+FileMessage       M  D    S  -  
+CardinalIO        M  D    S  -  
+UserIdentificati(on)  M  D    S  +  
+System            M  D    S  -  Runtime system for Modula-2 programs.
+Comint            M    O    H  Program SEK42.Comint: Command interpreter.
+CommandFile       M    O    -  Program SEK4.CommandFile: Command file handler.
+Storage           M  D  O  S  H  Storage allocation in the heap.
+ProgramMessage    M  D  O  S  -  
+ -------------------
+ 58 files
+C
+M.2.  Fix Allocated Files on a Honeywell Bull Disk Cartridge (by program DiskPatch)
++ n
+PC.BootFile                     Resident program on bootstrap file.
+PC.BootFile.Back                Resident program on alternate bootstrap file.
+PC.DumpFile                     
+PC.Dump1File                    
+FS.FileDirectory                
+FS.FileDirectory.Back           
+FS.NameDirectory                
+FS.NameDirectory.Back           
+FS.BadPages                     
+ -------------------
+ 9 files
+C
+M.3.  Files Used by the Command Interpreter
++ n
+SEK.Login.INFO              
+SEK.Start.COM               Not on the disk.
+SEK.Idle.COM                Not on the disk.
+ -------------------
+ 1 file
+C
+M.4.  Generation of Medos-2
++ n
+CreateHeader  M          -  Program to generate a header.
+DEFAULT               F  -  Default font.
+append        M    O     -  Utility to concatenate files.
+SEKmod                C    Commandfile to compile Medos-2.
+bootlink           O     -  Absolute boot linker.
+SEKinstall            C    Commandfile to bootlink and install Medos-2.
+ -------------------
+ 7 files
+C
+M.5.  Linker
++ n
+FileLookup        M  D        -  
+FilePool          M  D        -  
+link              M     O     H  Linker.
+Linker                     C     
+ -------------------
+ 7 files
+B
+S.  Screen Software
++ n
+Screen              M  D  O  S  H  Basic screen operations.
+ScreenDriver2       M  D     S  -  Used internally by Screen, TextScreen, WindowHandler.
+TextScreen          M  D  O  S  H  Textoutput and positioning.
+WindowHandler       M  D  O  S  H  Windows.
+CursorStuff         M  D  O  S  H  Cursor and menu.
+HELVETICA14B                 F     Optional font for menus.
+CursorRelations     M  D  O  S  H  Cursorpositions relative to windows.
+WindowDialogue      M  D  O  S  H  Window editor and input dispatcher.
+ScreenResources0    M  D  O  S  H  Access to resources from datatypes of Screen.
+Screenmod                    C     Commandfile to compile the screen modules.
+
+layout              M     O     H  Help for layout of windows on the screen.
+ -------------------
+ 35 files
+B
+E.  Editor
+C
+E.1.  Editor Program
++ t200 215 230 245 270 295.
+edit              O    H  The editor.
+GACHA14E            F     Optional font.
+User.Profile        X     Parameters for the editor, sil, etc.
+ -------------------
+ 3 files
+C
+E.2.  Editor Modules
++ n
+EditFonts       M  D       Management of fonts.
+EditDisplay     M  D       Management of screen.
+EditHeap        M  D       Special storage.
+EditFiles       M  D       Management of files.
+EditInput       M  D       Input procedures and replay mechanism.
+EditDocuments   M  D       Management of documents.
+EditWindows     M  D       Management of windows.
+Edit            M          Main program (command interpreter).
+Edit                    C   Commandfile to compile the editor.
+ -------------------
+ 16 files
+C
+E.3  Library Modules Used by the Editor 
++ n
+MouseCoords  M  D  O  S  +  Maping interface to the mouse.
+UserProfile  M  D  O  S  -  Reading/Writing of the user profile.
+BitmapIO     M  D  O  S  -  Reading/Writing of bitmaps.
+ -------------------
+ 12 files
+B
+I.  Micro Code
+C
+I.1.  Micro Code Assembler
++ t200 215 230 245 270 295.
+MIA.BinFile     M  D      
+MIA.TextIO      M  D      
+MIA.LongFiles   M  D      
+MIA.MapHandler  M  D      
+MIA.Labels      M  D      
+MIA.Assembler   M  D        
+MIA.Main        M           
+MIA.manual               T     Micro programming manual (in German).
+MIAmod                   C     Commandfile to compile the micro assembler.
+mia                   O     +  Main program.
+ -------------------
+ 16 files
+C
+I.2.  Micro Code
++ n
+int13dot2.MIC1        X   Part1 of the micro code.
+int13dot2.MIC2        X   Part2 of the micro code.
+int13dot2.MIC3        X   Part3 of the micro code.
+int13dot2.MIC4        X   Part4 of the micro code.
+int13dot2.MIC5        X   Part5 of the micro code.
+ESC.MIC               X   Micro code for the printer.
+ -------------------
+ 6 files
+B
+T.  Hardware Tests
++ n
+DiskPatch           M     O     h     
+DiskCheck           M     O     H     
+HardwareTest        M     O     -     
+Bars                M     O     -     
+JIO                 M  D        -  Used internally by disk test programs.
+Jdisk               M  D        -  Used internally by disk test programs.
+DisktestTape        M     O     +  (hwtest-book).
+HwtestTape          M     O     +  (hwtest-book).
+TapeBoot            M     O     -  
+alu.MOT                      X  +  Test programs for the 6802 (assembler object) in S-format.
+dsktst.MOT                   X  +  
+ex.MOT                       X  +  
+hwtest.MOT                   X  +  
+hwtst.MOT                    X  +  
+ifu.MOT                      X  +  
+ -------------------
+ 24 files
+B
+X.  Additional Programs and Files
++ n
+masterdisk.TEXT              X     This description.
+ -------------------
+ 1 file
+C
+X.1. Sil
++ n
+sil                     O     H  Simple illustrator.
+SIL               M              
+silprintfile            O        Conversion of sil diagrams into print files.
+SilPrintFile      M              
+SilDisplay        M  D           Local modules of sil.
+SilInput          M  D           
+SilObjects        M  D           
+Profile           M  D           
+silcheck                O     H  Checking of sil diagrams.
+SilCheck          M              
+Memory            M  D           
+HELVETICA8           W  P  F     
+HELVETICA8I          W  P  F     
+HELVETICA12                F     
+HELVETICA12I               F     
+HELVETICA16                F     
+HELVETICA20                F     
+Helvetica20          W  P  F     Former HELVETICA20S.
+SYMBOL32             W  P  F    
+ 
+examples.SIL               X     Sample diagrams.
+form.SIL                   X     
+frame.SIL                  X     
+MACRO1.SILM                X     Macro file.
+MACRO2.SILM                X     Macro file.
+mac0a.SIL                  X     
+mac1a.SIL                  X     
+mac2a.SIL                  X     
+mac3a.SIL                  X     
+mac4a.SIL                  X     
+mac5a.SIL                  X     
+SilDoc.TEXT                X     
+summary.SIL                X     
+SYMBOL32.SIL               X     
+ -------------------
+ 46 files
+C
+X.2. Skylla
++ n
+skylla                  O     H  Off-line formatter.
+Skylla            M              
+Charybdis         M  D           Used internally by Skylla.
+skyllaprintfile         O        Conversion of skylla-documents into print files.
+SkyllaPrintFile   M              
+ -------------------
+ 6 files
+C
+X.3. Hardcopy
++ n
+Printer            M  D        -  Local module of print.
+print              M     O     -  Print program for ASCII files.
+GACHA26                     F     Font for print.
+print.bitmap       M     O     -  Print program for bitmaps.
+spool                    O     -  Print program for print files.
+ -------------------
+ 8 files
+C
+X.4. Andra
++ n
+andra                      O     +  Editor/formatter.
+andraprintfile             O     +  Conversion of andra-documents into print files.
+showstyle                  O     +  
+skyllatoandra              O     +  Conversion of skylla-documents into andra-documents.
+GACHA14                 W  P  F    
+
+Andra.DOC                     X     Documentation of andra.
+V12.Andra.DOC                 X     Update to Andra.DOC.
+Andra.SIL                     X     
+V15.Andra.DOC                 X     Update to Andra.DOC.
+V15.Andra.SIL                 X     
+Diser.DOC                     X     Sample documents.
+Memo.DOC                      X     
+Diser.STL                     X     Sample styles.
+Memo.STL                      X     
+Skylla.STL                    X     
+ -------------------
+ 17 files
+C
+X.5. Draw
++ n
+draw                       O     +  Graphic editor.
+DRAWUserManual.DOC            X     Documentation of draw.
+V10.DRAW.DOC                  X     Update of the documentation.
+DRAWSummary.SIL               X     
+Diagram.DSP                   X     Sample documents.
+Roses.DSP                     X     
+FlowChartLib.DSP              X     
+ -------------------
+ 7 files
+C
+X.6. Demo programs
++ n
+Square              M     O     -  Drawing of squares.
+Hilbert             M     O     -  
+Sierpinski          M     O     -  
+Wirth               M     O     -  
+GraphicDemo         M     O     -  
+Life                      O     -  
+SetFont             M     O     -  
+ShowPicture         M     O     -  
+Chillon.PICT                 X  -  Halftone pictures.
+Luzern.PICT                  X  -  
+Kuehe.PICT                   X  -  
+ShowSCF             M     O     -  Font inspector.
+Time                      O     -  Analog clock.
+Rectangles          M     O     -  Automatic demos.
+LineArea                  O     -  
+RandomDemo                O     -  
+Pool                      O  F  -  Billard game.
+Pacman                    O     -  !!!
+
+comdex.DEMO                  X     Sample commandfile for demo.
+demo                M     O  T  +  Commandfile-driven demo program.
+Bars                M              
+Demo3D                    O        
+DISER20                      F     
+DISER40                      F     
+OLDENGLISH20                 F     
+hand3                        X     
+InOut                  D           
+newsnowflake              O        
+PacDemo                   O        
+PoolDemo                  O        
+WindowDemo2               O        
+WindowDemo3               O        
+ -------------------
+ 44 files
+C
+X.7. Fonts
++ n
+editSCF                O        Screen font editor.
+editPRF                O        Printer font editor.
+makewidfile            O     -  Generation of WID-files.
+DISER12                   F     
+DISER20             W  P  F     
+Timesroman10        W  P  F     "UNIX" fonts.
+Timesroman12        W  P  F     
+Timesroman12I       W  P  F     
+Timesroman12B       W  P  F     
+Timesroman14        W  P  F     
+Timesroman16        W  P  F     
+Timesroman20        W  P  F     
+Gacha12             W  P  F     
+APL8                W  P        
+BOCKLIN10           W  P        
+BOCKLIN22           W  P        
+B8                  W  P        
+B9                  W  P        
+B11                 W  P        
+B14                 W  P        
+B16                 W  P        
+B17                 W  P        
+CHESS16             W  P        
+CLARENDON10         W  P        
+CLARENDON12         W  P        
+CORONET14           W  P        
+CYRILLIC8           W  P        
+FIX8                W  P        
+I8                  W  P        
+I9                  W  P        
+I11                 W  P        
+I14                 W  P        
+I16                 W  P        
+I17                 W  P        
+MONA20              W  P        
+MRI                 W  P        
+MRISYMBOL32         W  P        
+MRI1SYMBOL          W  P        
+NONIE10R            W  P        
+OLDENGLISH12        W  P        
+R7                  W  P        
+R9                  W  P        
+SHADOW12            W  P        
+ -------------------
+ 91 files
+B
+H.  Handbook
++ n
+hand.hints.TEXT            X     
+hand.print                 X     
+hand.title.TEXT            X     
+hand0.TEXT                 X     
+hand1.TEXT                 X     
+hand2.TEXT                 X     
+hand3.TEXT                 X     
+hand4.TEXT                 X     
+hand5.Fig1.PICT            X     
+hand5.Fig2.PICT            X     
+hand5.Fig3.PICT            X     
+hand5.TEXT                 X     
+hand6.TEXT                 X     
+hand7.TEXT                 X     
+hand8.Fig1.PICT            X     
+hand8.Fig2.PICT            X     
+hand8.TEXT                 X     
+hand9.Fig1.SIL             X     
+hand9.Fig2.PICT            X     
+hand9.Fig3.SIL             X     
+hand9.TEXT                 X     
+hand10.TEXT                X     
+hand11.TEXT                X     
+hand12.TEXT                X     
+hand13.TEXT                X     
+hand14.Fig1.SIL            X     
+hand14.Fig2.SIL            X     
+hand14.TEXT                X     
+ -------------------
+ 28 files
+ -------------------
+Total  687 files
+ ===================

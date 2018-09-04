@@ -1,0 +1,720 @@
+A c
+6.  Utility Programs
+C Y15 c
+15.5.82
++
+This chapter gives an overview of some utility programs which provide the most important services on Lilith.  Utility programs are usually stored on the disk cartridge (medium name 7DK0).  The file name is derived from the program name, beginning with the prefix 7SYS0 and ending with the extension 7OBJ0.  Programs are called for execution by their name.
+x25 t210.
+Program name  7directory0
+File name  7DK.SYS.directory.OBJ0
++ w15
+1List of the Programs0
+x25 t170 450.
+directory    Give a list of file names  6.1.
+delete       Remove files from the disk  6.2.
+protect      Set protection on files  6.2.
+unprotect    Cancel protection on files  6.2.
+copy         Make copies of the file contents  6.3.
+rename       Change file names  6.3.
+list         List a text file on screen  6.4.
+inspect      Inspect the contents of a file  6.5.
+xref         Generate a reference list of a text file  6.6.
+link         Link separate modules to a program  6.7.
+decode       Disassembler of object files  6.8.
+layout       Tool for screen layout  6.9.
+hermes       Transfer files to another Lilith  6.10.
+hpcopy       Transfer files to a Hewlett Packard terminal  6.11.
+applecopy    Transfer files to an Apple diskette  6.12.
+boot         Bootstrap of the computer  6.13.
+altboot      Bootstrap the computer with the alternate boot file  6.13.
++ w15
+Most programs are operating on files, and they therefore will prompt for a 1file name0 and probably will also accept 1program options0.  The syntax of file names and program options is given in chapter 4.
+
+There are some programs which may operate on a group of files.  For this purpose the accepted file name may contain 1asterisk0 2*0 and 1percent0 2%0 characters as 1wildcard symbols0.  An asterisk stands for any (including the empty) sequence of legal characters (letters, digits, periods), a percent for just one legal character.  This allows to select all file names that match the pseudo file name.
+x25 t190.
+Pseudo file name     7M*2.TXT0
+Matching file names  7M2.TXT0
+                     7Modula2.TXT0
+                     7Modula2.Version2.TXT0
+
+Pseudo file name     7M%.TXT0
+Matching file names  7M1.TXT0
+                     7M2.TXT0
+
+Pseudo file name     7Mouse.*0
+Matching file names  7Mouse.Head0
+                     7Mouse.Tail0
+                     7Mouse.old.Head0
++
+An asterisk enclosed by two periods would match a single period and a leading or trailing asterisk with a separating period would match the empty sequence.  Therefore 7Mouse0 would also be a matching name in the third example.
+p B
+6.1.  directory
++
+Leo Geissmann  15.5.82, rev. 7.10.82
+
+The program 1directory0 shows directory information of the selected files.  It accepts a file name with wildcard symbols.  Hitting the 2RETURN0 key instead of specifying a name means that all files on the cartridge should be selected.  For all files with a name matching the specified name, the program displays directory information in the following sequence:
+x25 n
+- Protection symbol:  A 2#0 if the file is protected
+- File name
+- Length in blocks (1 block = 1 K Word)
+- Date of creation or last modification
++ w15
+1Example0
+= x25
+# Mouse.old.Head   6   22.Sep.80
+  Mouse.Head       7   12.Jan.81
+  Mouse.Tail       3   30.Sep.80
+  Mouse            1   17.Feb.81
++ w15
+Before terminating, the program displays a summary
+x25 n
+Number of listed files
+Number of blocks used by the files
+Number of free blocks on disk cartridge
++
+If the information fills more than one screen page, the string 7...0 is displayed and the program is waiting until any key is pressed on the keyboard (2ESC0 would stop the program immediately).
+
+With program option 1EXtra0, supplementary information is displayed for each file.  In this case the information sequence is as follows
+x25 n
+- Protection symbol:  A 2#0 if the file is protected
+- File name
+- Length in blocks (1 block = 1 K Word)
+- Exact length in Bytes
+- Number of the directory entry
+- Date of creation or last modification
+- If modified:  Modification version
+- If modified:  Date of creation
++
+To get the directory information on a file instead on screen, the program option 1Output0 must be specified.  In this case the program asks for a file name and writes the information on a file with this name.
+= x25
+*directory
+ directory> Mouse.*/output
+ output file> Mouse.Directory
++ w15
+1Program Options0
++ x25
+2Alpha0
+x50 Y2
+Information is listed in the alphabetic order of the file names.
++ x25
+2NOAlpha0
+x50 Y2
+Information is listed in the order of the directory.  1Default0.
++ x25
+2Equal0
+x50 Y2
+Capital and lower case letters are treated as equal.
+p + x25
+2NOEqual0
+x50 Y2
+Capital and lower case letters are treated as distinct.  1Default0.
++ x25
+2Output0
+x50 Y2
+Information is listed on an output file.  Program will ask for the name of an output file.
++ x25
+2Page0
+x50 Y2
+Information displayed on screen page by page.  A key must be pressed after each page.  1Default0.
++ x25
+2Scroll0
+x50 Y2
+Information displayed on screen continuously.  After a key is pressed, output is stopped until a second key is pressed.
++ x25
+2SHort0
+x50 Y2
+Short information.  Only file names are listed.
++ x25
+2NORMal0
+x50 Y2
+Normal information, as described above.  1Default0.
++ x25
+2EXtra0
+x50 Y2
+With supplementary information, i.e. exact length in bytes, the file number and modification information.
++ x25
+2Continue0
+x50 Y2
+Program continues after execution of the operation and prompts again for a file name.
++ x25
+2Terminate0
+x50 Y2
+Program terminates after execution of the operation.  1Default0.
++
+Capitals mark the abbreviations of the option values.
+p B
+6.2.  delete, protect, and unprotect
++
+Leo Geissmann  15.5.82, rev. 7.10.82
+
+The program 1delete0 allows to remove the selected files, 1protect0 and 1unprotect0 handle the protection of the files.  In the current implementation of the file system, protection means that a file cannot be changed.
+
+The programs accept a file name with wildcard symbols.  For all files with a matching name on the disk cartridge the programs display the file name and prompt for an assertion (2y0 for 1yes0; 2n0 or 2RETURN0 for 1no0) before doing the desired operation.
+= x25
+Mouse.Head   delete? yes
+Mouse.Tail   delete? no
++
+Each program skips those files on which the operation cannot be applied, i.e. protected files are skipped by delete and protect, and unprotected files are skipped by unprotect.
++ w15
+1Program Options0
++ x25
+2Query0
+x50 Y2
+Operation on file must be asserted.  1Default0.
++ x25
+2NOQuery0
+x50 Y2
+Operation on file without assertion.
++ x25
+2Equal0
+x50 Y2
+Capital and lower case letters are treated as equal.
++ x25
+2NOEqual0
+x50 Y2
+Capital and lower case letters are treated as distinct.  1Default0.
++ x25
+2Continue0
+x50 Y2
+Program continues after execution of the operation and prompts again for a file name.
++ x25
+2Terminate0
+x50 Y2
+Program terminates after execution of the operation.  1Default0.
++
+Capitals mark the abbreviations of the option values.
+p B
+6.3.  copy and rename
++
+Leo Geissmann  15.5.82, rev. 7.10.82
+
+The program 1copy0 handles the copying of files, 1rename0 the change of file names.
+
+Two file names with wildcard symbols are accepted by the programs: a 1from-name0 and a 1to-name0.  The from-name specifies the selected files, to-name the corresponding new names.  In to-name only asterisks are accepted as wildcard symbols, and these must be separated by periods from other identifiers.
+
+The 1compatibility0 of from-name and to-name is checked and an error message is displayed, if a projection is impossible.  Be aware that the projection of the names 1is not always clear0 and that the programs might come to an 1interpretation which differs from the intended one0.
+
+For all files with a name matching from-name, this name and the new generated name are displayed and the programs prompt for an assertion (2y0 for 1yes0; 2n0 or 2RETURN0 for 1no0) before copying or renaming the file.  If a file with the new generated name already exists, the replacement of the existing file must be asserted.
+= x25
+Mouse.Head  to Mice.Head  copy? yes  replace? yes
+Mouse.Tail  to Mice.Tail  copy? no
++ w15
+1Program Options0
++ x25
+2Query0
+x50 Y2
+Operation on file must be asserted.  1Default0.
++ x25
+2NOQuery0
+x50 Y2
+Operation on file without assertion.
++ x25
+2Equal0
+x50 Y2
+Capital and lower case letters are treated as equal.
++ x25
+2NOEqual0
+x50 Y2
+Capital and lower case letters are treated as distinct.  1Default0.
++ x25
+2Replace0
+x50 Y2
+Existing files with new name are replaced without assertion.
++ x25
+2NOReplace0
+x50 Y2
+Existing files with new name must not be replaced.  1Default, if NOQuery is specified0.
++ x25
+2Continue0
+x50 Y2
+Program continues after execution of the operation and prompts again for a file name.
++ x25
+2Terminate0
+x50 Y2
+Program terminates after execution of the operation.  1Default0.
++
+Capitals mark the abbreviations of the option values.
+p B
+6.4.  list
++
+Werner Winiger  7.10.82
++
+Utility to list a textfile on your system's display.
+
+The program asks for a filename.  Default extension is LST.  As option
+you may specify whether you want to see the file page after page or scrolled
+up after each line.
+
+Example:
+= x25
+*list
+ list> Example.MOD/P
+MODULE Example; 
+    ...
++
+In the scroll mode the program may be interrupted temporarily by 
+typing any key.  The ESC-key then will
+terminate it, any other key resumes displaying of the file.
+
+With the "?"-key or the HELP-key
+instead of a filename you may ask the program for the available options.
+
+The following option is available:
+- f2 x25
+Paging
++ x50 Y1
+The file is displayed pagewise.  The program writes "..." 
+on the bottom line of the display and waits until you 
+press a key.  ESC in this situation terminates the program.
+p B
+6.5.  inspect
++
+Peter Lamb  15.5.82
+
+The program 1inspect0 displays the contents of a file in several formats on the screen.  It is normally used to inspect files consisting of encoded information.  The program 1repeatedly0 prompts for a file name and for program options.
+= x25
+inspect> Salary.DATA/octal
++
+If the file name is not specified, the previously accepted name is used.  If no program options specifying the output format are given, the previous format is used.  The default output format at the beginning is set according to the program options Octal and Word.
+
+If more than one display format (Ascii, Octal or Hexadecimal) is given, each dumped item will be displayed in each of the formats given.  For example
+= x25
+inspect> /byte/ascii/hex
++
+will display bytes as both ASCII characters and hexadecimal numbers.
+
+ASCII codes from 0C to 40C are displayed as the corresponding control code (1C is displayed as 7^A0).  ASCII codes >= 177C are displayed as octal numbers.
+
+The leftmost column of the output is the 1address of the data0 and is in octal, unless program option Hexadecimal has been used, and then it is in hexadecimal.  Unless program option OUtput is used, the dump will appear on the screen.
+
+The output may be paused by typing any character except ESC or CTRL-C and restarted by typing another character.  Typing ESC will stop the printout and ask for another file to dump.
++ w15
+1Program options0
++ x25
+2Byte0
+x50 Y2
+Information on file is displayed as a sequence of bytes.
++ x25
+2Word0
+x50 Y2
+Information on file is displayed as a sequence of words.  1Default0.
++ x25
+2Ascii0
+x50 Y2
+Displayed values are represented as ASCII characters.
++ x25
+2Octal0
+x50 Y2
+Displayed values are represented as octal numbers.  1Default0.
++ x25
+2Hexadecimal0
+x50 Y2
+Displayed values are represented as hexadecimal numbers.
++ x25
+2Startaddress0
+x50 Y2
+Information is displayed from this file position.  Will prompt for specification of the start position.  Default value is the beginning of the file.
++ x25
+2Endaddress0
+x50 Y2
+Information is displayed until this file position.  Will prompt for specification of the start position.  Default value is the end of the file.
++ x25
+2OUtput0
+x50 Y2
+Information is written on an output.  Will prompt for a file name.
++ x25
+2HELP0
+x50 Y2
+Program will display information concerning its operation.
++
+Capitals mark the abbreviations of the option values.
+p B
+6.6.  xref
++
+Leo Geissmann  15.5.82
+
+Program 1xref0 generates 1cross reference information tables0 of text files, especially of Modula-2 compilation units.
+
+The program reads a text file and generates a table with line number references to all identifiers occuring in the text.  It respects the Modula-2 syntax. This means that all word symbols of Modula-2 are omitted from the table.  The program also skips 1strings0 (enclosed by quote marks 2"0 or apostrophes 2'0) and 1comments0 (from 2(*0 to the corresponding 2*)0).
+
+The program prompts for the name of the input file. Default extension is 2LST0.
+= x25
+*xref
+ input file> BinaryTree.LST
++
+The generated table is listed on a 1reference file0 in alphabetical order. In identical character sequences, capitals are defined 1greater0 than lower case letters.
+
+If the lines on the input file start with a number, these numbers are taken as referencing line numbers, otherwise a 1listing file0 with line numbers is generated (see also program options L and N).
+
+The names of the output files are derived from the input file name with the extension changed as follows
+x25 n
+7XRF0   for the reference file
+7LST0   for the listing file
++ w15
+1Program Options0
++ x25
+2S0
+x50 Y2
+Display statistics on the terminal.
++ x25
+2L0
+x50 Y2
+Generate a listing file with 1new0 line numbers.
++ x25
+2N0
+x50 Y2
+Generate no listing file.  The line numbers in the reference table will refer to the line numbers on the input file.  All lines on the input file without leading line numbers are skipped (e.g. error message lines).
+p B
+6.7.  link
++
+Svend Erik Knudsen  15.5.82
+
+The program 1link0 collects the codes of separate modules of a program and writes them on one file.  The program 1link0 is called 1linker0 in this chapter.
+
+Upon compilation of a separate module, the code generated by the Modula-2 compiler is written on an 1object file0.  An object file may be loaded by the loader of Medos-2 directly.
+
+As a program usually consists of several separate modules, the loader has to read the code of the modules from several object files which are searched according to a 1default strategy0.  On the one hand, this is time consuming because several files must be searched, on the other hand, it could be useful to subsitute a module from a file with a non-default name.  These are some reasons for having a linker program.
+
+The linker simulates the loading process and collects the codes of all (nonresident) modules which are, directly or indirectly, imported by the so-called 1main module0, i.e. the module which constitutes the main program.  The linker applies the same default strategy as  the loader to find an object file.  A file name is derived from (the first 16 characters of) the module name.  If a first search is not successful, the prefix 7LIB0 is inserted into the file name, and a file with this name is searched.
+x25 t210.
+Module name  7Options0
+First default file name  7DK.Options.OBJ0
+Second default file name  7DK.LIB.Options.OBJ0
++
+The linker first prompts for the object file of the main module (default extension 7OBJ0).  Next, it displays the name of the main module.  If the file already contains some linked modules, the names of these modules are displayed next.  Afterwards, a name of a not yet linked imported module is displayed, followed by the file name of the corresponding object file.  On the next lines the names of the modules linked from this file are listed.  This is repeated until all imported modules are linked.
+= x25 t350.
+*link
+ Linker V3.4 for Medos-2
+ object file> delete.OBJ
+      Delete                                   1main module7
+ NameSearch: DK.LIB.NameSearch.OBJ             1second default file name7
+      NameSearch
+ Options: DK.Options.OBJ                       1first default file name7
+      Options
+      FileNames                                1module was linked to Options7
+ end of linkage
++
+After successful linking, all linked modules are written on the object file of the main module!
+
+The linker accepts the program option 7Q0 (query) when it prompts for the main module.  If this option is set, the linker also prompts for the file names of the imported modules.  Type a file name (default extension 7OBJ0) or simply press the 2RETURN0 key to apply the default strategy.  A prompt is repeated until an adequate object file is found, or the 2ESC0 key is pressed.  The latter means that this module should not be linked.
+
+With the query option the linker also asks whether or not a module on a object file should be linked.  Type 2y0 or 2RETURN0 to accept the module, otherwise type 2n0.
+= x25 t350.
+ object file> delete.OBJ/q                     1query option set7
+      Delete
+ NameSearch> NameSearch.new.OBJ                1own file substituted7
+      NameSearch   ?  yes
+ Options> DK.Options.OBJ                       1default file name7
+      Options      ?  yes
+      FileNames    ?  no                       1module not linked from this file7
+ FileNames> FileNames.own.OBJ
+      FileNames    ?  yes
+p B
+6.8.  decode
++
+Christian Jacobi  10.5.82
++Y15
+Program 1decode0 disassembles an object file.
++
+The program reads an object code file and generates a textfile
+with mnemonics for the machine instructions.  It respects the structure of 
+the object file as generated
+from the compiler.
+
+The program prompts for the name of the input file.  Default extension is 2OBJ0.
+=x25
+*decode
+ decode > program.OBJ
++
+The name of the output file is derived from the input file name with the extension 
+changed to 2DEC0.
+
+The intended usage
+of this program is to check the compiler after modifications of the code 
+generation; however this program may be used also to learn about the code 
+generation.  In production
+there is no need to know the code generated by the compiler.  
+p B
+6.9.  layout
++
+Christian Jacobi  20.2.82
++Y15
+Program 1layout0 is used to design the screen layout for programs 
+which use windows.
++
+The program allows creation of windows and to query interactively
+the coordinates of the windows.  When the program is started,
+a window 1LAYOUT0 is created.  Other windows can be opened, the windows
+can be moved and changed.  At any time it is possible to
+write the coordinates of the windows.
+
+The program is interactively driven
+with the mouse.  Pressing a mouse button calls either the window menu or
+the (standard) background menu, depending on where the cursor points 
+to.  To exit the program use the exit command of the background menu.
+
+When you type on the keyboard, the text is written in the 1active0 window.  That
+window is active, where a mouse button was clicked most recently.
+CY15
+Window Menu Commands
++f2x25
+alfa
++x50Y2
+Writes the alphabet into the window.
++f2x25
+clear
++x50Y2
+Clears the window.
++f2x25
+border
++x50Y2
+Writes the outside (border) coordinates of the window into the window.
++f2x25
+inside
++x50Y2
+Writes the coordinates of the inside area of the window into the window.
++f2x25
+layout
++x50Y2
+Asks for a filename, creates a file and writes the coordinates of all windows to the file.
++f2x25
+open
++x50Y2
+Opens another window.  Type the header line of the window, terminated 
+by RETURN.  Point the diagonal of the new window with the mouse.
+CY15
+Background Menu Commands
++
+This is the standard background menu.  It allows to delete, to change, 
+to move ... windows, to call the command interpreter and to exit.  This background 
+menu is described with the module
+WindowDialogue.
+CY15
+Format of the Layout File
++
+Every window gets a 3 line entry.  The first line shows the title of the 
+window.  The second line shows the outer coordinates of the window in decimal 
+notation.  The third line shows again the outer coordinates of the window, but
+in octal notation.
++f1 w15
+Example
+= x25
+procedure call chain 
+  5 255 537 147
+  5 377 1031 223
+p B
+6.10.  hermes
++
+Jirka Hoppe  14.5.82
++
+The program 1hermes0 transfers files between two Lilith computers
+connected by a V24 (RS 232) cable.
+
+To transfer a file do the following steps:
+
+1/ Connect both computers with a cable.  Be sure that the RS232 switch
+is in the 'CPU-PORT' position (up) and that the speed switch on both
+computers is set to the same speed (recommended is 9600 baud).
+ This is the normal (default) situation, preset by the hardware technician.
+
+2/ Start the 1hermes0 program on both computers.
+
+3/ The both programs ask you: 7are you a master?0
+ Answer with 2y0 on the computer where you will give the transfer commands (master),
+answer with 2n0 on the other computer (slave).
+ It is recommended to start first the slave computer and later the master.
+ The master will respond with 7opening line...0. When the connection with
+the slave is established, a message 7line opened0 will be displayed.
+
+4/ The master now asks you for the names of the files that should be transferred.
+ The syntax of a file name is the standard syntax with a prefix allowing
+to distinguish between both computers.  The prefix 1ME:0 identifies the
+ master, the prefix 1YOU:0 identifies the slave.  Type 2M0 for 1ME:0; type 2Y0 for 1YOU:0.
+
+If you try to write a file that already exists, the program asks you
+if you would like to replace the old file. 
+Answer with 2y0 to replace the file or with 2n0
+to abandon this file transmission.
+ This query may be turned off by an option 1n  (no query)0 following the
+1from0 file.
+
+When specifying the name of the 2to:0 file you may type a RETURN only.
+ In that case the name of the 2from:0 file will be taken as default.
+w15
+Examples
+= x25
+from>ME:MyMoney.All<cr>
+to>YOU:debt<cr>
++ x25
+This transfers a file 'MyMoney.All' from the master computer
+to the file 'debt' on the slave computer.
+ If the file already exists on the master computer, you will be
+asked if the file should be overwritten.
+= x25
+from>YOU:hundred.francs/n<cr>
+to>ME:<cr>
++x25
+transfers a file 'hundred.francs' on the slave computer to
+the file 'hundred.francs' on the master computer. 
+ If the file already exists on the master computer, it will be overwritten without any notice.
+x0
+5/ At the end of the transmission you could exit from the master with typing ESC.
+ The program asks you in which way you like to exit.
+ Type:
+x25
+2K0 or 2ESC0 - to exit and turn off the slave process
+
+2S0 - to exit but let the slave process active to reopen the session next time
+the master starts hermes.
+
+2R0 - to return back to the hermes program
+x0
+
+If the slave process is turned off by the master,
+a message 7the transmission is finished,
+you may use your machine again0 will be displayed on the his screen.
+
+
+The slave must be killed by 1CTRL-C0, if he is not turned off by the master.
+w15
+2Remarks0
+
+Since the program works without interrupts, there may arise a situation,
+where the protocol gets out of the synchronization.  If the program reports
+the 7lost line0 or if the line could not be opened at the beginning, please
+restart both programs.
+ In the normal case checksum of each packet is computed and packets with
+any kind of troubles are retransmitted.
+ The transmission speed is about 1Kword in 2.6 seconds.
+p B
+6.11.  hpcopy
++
+Werner Winiger  6.5.82
++
+Utility to transfer a textfile from/to the tape cartridge of a Hewlett Packard 26XY
+terminal.
+
+The program checks whether a terminal is connected to your system's V24 
+connector and whether it is ready to transmit data.  
+
+If so, the program asks for a file name.  Default extension is MOD.  The source 
+device of the
+file is indicated (as for the program hermes) with a prefix to the file name.  The
+
+prefix 1ME:0 stands for your Lilith (i.e. the file is transferred from disk to tape),
+1YOU:0 denotes the terminal (i.e. the file is copied from the tape cartridge).  You
+only have to type the first character of the prefix (lower case), the rest will be
+supplied by the program.
+
+Examples:
+= x25
+*hpcopy
+ copy from> ME:Example.MOD
+        to> YOU:
+ done
+*
+
+*hpcopy
+ copy from> YOU:
+        to> ME:Example.TXT
+ done
+*
++
+The program doesn't know about positioning the tape.  This means that the cartridge has to
+be positioned appropriately before transferring the file.  After copying a file,
+however, hpcopy writes a file mark on the tape.
+p B
+6.12.  applecopy
++
+Beat Frey  8.10.82
+
+The program 1applecopy0 transfers files between a Lilith and an Apple computer
+connected by a V24 (RS 232) cable.
+
+Boot the Apple using a floppy with the following files on it:
+f7x25n
+SYSTEM.PASCAL
+SYSTEM.APPLE
+SYSTEM.MISCINFO
+APPLECOPY.CODE
++
+Maybe you would also like to include the files
+f7x25n
+SYSTEM.FILER
+FORMATTER.CODE
++
+Now insert the floppy which should become the source or destination of your
+transferred files into drive #5.  Then 2X0(ECUTE) the 2APPLECOPY0 program on the
+Apple and start the 2applecopy0 program on Lilith.  If no hardware problems
+occured (e.g. missing connection, unformatted floppy in drive #5) three
+windows are opened on the Lilith screen, one of them shows the directory of the
+Apple floppy.
+Y15
+2Cursor Shapes and Mouse Buttons0
++
+The shape of the cursor (apple,arrow or line invert) depends on the position and the
+invoked command, and determines the effects when pressing the mouse buttons.
+
+1apple shape: 0left and right button ignored, middle button: pop-up menue.
+
+1arrow shape: 0left (right) button: scroll up (down), middle button: flip.
+
+1line invert: 0you are expected to select a filename in a list.  Do it by
+pressing any mouse button.  Selecting an empty line has the same effect as
+hitting the ESC key.
+Y15
+2Invoking Commands0
++
+Commands are selected out of the following menu (press middle mouse button!):
+
+1MODE0   The applecopy program is mainly designed to backup Lilith files on
+an Apple floppy.  They are stored as DATA files and contain a special header.
+ Every type of Lilith files can be transferred in the 1'backup'0 mode.  If you like
+to transfer TEXT files (e.g. PASCAL programs) select the 1'appleformat'0 mode.
+The 1'appleformat'0 mode slows down the transfer rate and the transferred files 
+use more space on the floppy.  Default is 1'backup'0 mode.
+
+1AP -> LI0   Transfer a file from the Apple to Lilith according to the selected
+mode.  Move the cursor (which is now line inverting) up and down and press
+a mouse button to select the inverted filename for transmission.  Then you are
+expected to type in a destination filename.  Default filename is the source filename.  To exit from that command hit the ESC key or select an empty line.
+
+1LI -> AP0   Transfer a file from Lilith to the Apple according to the selected
+mode.  Move the cursor (which is now line inverting) up and down and press
+a mouse button to select the inverted filename for transmission.  Then you are
+expected to type in a destination filename.  Take care that your name is shorter
+than 15 characters which is an upper limit for the length of Apple filenames and
+remember that the Apple does not distinguish between capital and lower case
+letters.  As a default a length adjusted name is taken.  The Apple filelist
+is refreshed after each successful transfer.  To exit from that command hit
+the ESC key or select an empty line.
+
+1AP FILELIST0   Refreshes the Apple filelist.  Useful for instance when changing
+the floppy in drive #5.
+
+1COMMANDFILE0   You are asked to type in the name of a commandfile.  This command
+sets the mode to 'backup'.  The commandfile has the following structure:
+The first line contains either the word 'backup' or 'restore' which determines
+the direction of the transfer. The following lines contain the source and
+destination filenames, separated by a blank or a return character.  The destination
+filename may be omitted, but not the following separator character!  In that case
+the source filename is used as destination filename.  2Caution: 0 The Apple
+doesen't distinguish between lower case and capital letters!!  Filenames are allowed
+to consist of at most 15 characters. If a longer filename is encountered,
+transmission stops and you are asked to type in a shorter filename.
+
+1EXIT0   Leave the program.  The program asks you to confirm that command.
+ Type 'y' to exit or 's' to exit but let the Apple slave process active or any
+other character to return back to the applecopy program.
+p B
+6.13.  boot and altboot
++
+Svend Erik Knudsen  15.5.82
++ w15
+The programs 1boot0 and 1altboot0 initiate a 1soft boot0 of Medos-2 on Lilith.
+ w15
+The program 1boot0 initiates a bootstrap from the normal boot file 1(PC.BootFile),0 whereas the program 1altboot0 initiates a bootstrap from the alternate boot file 1(PC.BootFile.Back).0 The programs need no input from the keyboard.
++ w15 Bc
+W a r n i n g
++
+The devices connected to Lilith are not reset by a 1soft boot0, as this is not generally possible from software.  Whenever you have to boot and you are not sure, whether or not a device using direct memory access is running, 1press the reset button0 on the rear of the keyboard 1and hit the space bar0 or type CTRL-A.

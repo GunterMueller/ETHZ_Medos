@@ -1,0 +1,35 @@
+DEFINITION MODULE MDUtility;  (* C. Binding; redesigned by P. Karrer *)
+
+FROM SYSTEM IMPORT WORD;
+
+FROM WindowHandler IMPORT Window;
+
+EXPORT QUALIFIED DisplayHex, DisplayByte, DisplayChar, DisplayReal,
+  DisplayIdent, Same, ResetWindow, ResetLowWindow, Border;
+
+CONST Border = 16;   (*width of left windowborder*)
+
+PROCEDURE Same(a1, a2: ARRAY OF CHAR): BOOLEAN;
+(*to compare two strings of char*)
+
+PROCEDURE ResetWindow( w: Window);
+(* to clear the window and paint the left border*)
+
+PROCEDURE ResetLowWindow( w: Window; line, pos: CARDINAL);
+(*to clear the lower part of window*)
+
+PROCEDURE DisplayReal(rea: REAL; n: CARDINAL; w: Window);
+(*write a real value on n positions in window w*)
+
+PROCEDURE DisplayHex(wor: WORD; w: Window);
+(*write one word as hexadecimal into w*)
+
+PROCEDURE DisplayByte(wor: WORD; w: Window);
+(*write one word as two octal bytes into w*)
+
+PROCEDURE DisplayChar(wor: WORD; w: Window);
+(*write one word (two bytes) as two char into w*)
+
+PROCEDURE DisplayIdent(id: ARRAY OF CHAR; len: CARDINAL; w: Window);
+
+END MDUtility. 

@@ -1,0 +1,11 @@
+DEFINITION MODULE MDScreenView; (* H.K. Buehrer *)
+
+  EXPORT QUALIFIED InitScreenView, TerminateScreenView;
+
+  PROCEDURE InitScreenView;
+    (*opens screen window *)
+  PROCEDURE TerminateScreenView;
+    (*clean up, after level-change *)
+
+END MDScreenView.
+

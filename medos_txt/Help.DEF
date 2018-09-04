@@ -1,0 +1,40 @@
+DEFINITION MODULE Help;     (* Ch. Jacobi 8.9.80; modified 23.8.82*)
+  FROM SYSTEM IMPORT WORD;
+  EXPORT QUALIFIED Message, Show, Debug, Assert, Connect,
+                   TraceOn, TraceOff, Trace ;
+
+  (* Restriction:
+       Do NOT call Help-procedures dynamically from within a procedure
+       which is assigned with TerminalBase.AssignRead; since this
+       can result in (bad) recursiv calls of CursorStuff.TrackCursor
+  *)
+
+  PROCEDURE Message(text: ARRAY OF CHAR);
+    (* outputs the text;
+       active only if TraceOn *)
+
+  PROCEDURE Show(text: ARRAY OF CHAR; value: WORD);
+    (* write text and value to "Terminal";  
+       active only if TraceOn *)
+
+  PROCEDURE Debug(text: ARRAY OF CHAR);
+    (* enables some interactive debugging actions;
+       active only if TraceOn *)
+
+  PROCEDURE Assert(b: BOOLEAN; text: ARRAY OF CHAR); 
+    (* b must be TRUE; otherwise debugging actions are enabled *)
+
+  PROCEDURE Connect;
+    (* interactive query to connect Messages to 
+       either "Terminal" or "Screen" *)
+  
+  PROCEDURE TraceOn;  
+    (* activate output by Message, Show and Debug *)
+
+  PROCEDURE TraceOff;
+    (* deactivate output by Message, Show and Debug *)
+
+  PROCEDURE Trace(): BOOLEAN;
+    (* "output by Message, Show and Debug is active" *)
+
+END Help.

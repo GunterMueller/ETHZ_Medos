@@ -1,0 +1,256 @@
+IMPLEMENTATION MODULE SilDisplay;    (*NW 15.2.83*)
+  FROM SYSTEM IMPORT ADR;
+  FROM FileSystem IMPORT
+       File, Lookup, Response, ReadWord, Close;
+  FROM DisplayDriver IMPORT
+       BMDescriptor, BMD, ScreenHeight, ScreenWidth, BuildBMD;
+  FROM Frames IMPORT  FramePointer, Allocate, nil;
+
+  CONST CursorWidth = 16; CursorHeight = 16;
+    MenuWidth = 48; MenuHeight = 116;
+
+  TYPE
+    DispMode = (replace, paint, invert, erase);
+    BlockDescriptor =
+      RECORD x,y,w,h: INTEGER
+      END ;
+    Pattern =
+      RECORD length: CARDINAL;
+             w: ARRAY [0..15] OF BITSET;
+      END ;
+
+  VAR i: CARDINAL;
+    XM, YM: INTEGER;  (*Menu position*)
+    font: ARRAY [0..3] OF FramePointer;
+    cursor, allmap, blk: BlockDescriptor;
+    CursorPat0, CursorPat1: Pattern;
+    TickPat: Pattern;
+    pat: ARRAY [0..3] OF Pattern;
+    SaveBlk: BlockDescriptor;
+    SaveBMD: BMDescriptor;
+    SaveBMA: FramePointer;
+
+  PROCEDURE GET(chan: CARDINAL; VAR val: CARDINAL);
+    CODE 240B
+  END GET;
+
+  PROCEDURE PUT(chan, val: CARDINAL);
+    CODE 241B
+  END PUT;
+
+  PROCEDURE TrapsOn;
+    CODE 247B; 2; 0; 167B
+  END TrapsOn;
+
+  PROCEDURE TrapsOff;
+    CODE 247B; 2; 325B; 167B
+  END TrapsOff;
+
+  PROCEDURE MOVF(d0: FramePointer; d1: CARDINAL;
+                 s0: FramePointer; s1, n: CARDINAL);
+    CODE 337B
+  END MOVF;
+
+  PROCEDURE REPL(d: DispMode; VAR bmd: BMDescriptor;
+                 VAR src: Pattern; VAR dst: BlockDescriptor);
+    CODE 343B
+  END REPL;
+
+  PROCEDURE BBLT(m: DispMode; VAR d0: BMDescriptor;
+                 VAR s1, d1: BlockDescriptor;
+                 VAR s0: BMDescriptor);
+    CODE 344B
+  END BBLT;
+ 
+  PROCEDURE DCH(VAR bmd: BMDescriptor; font: FramePointer;
+                VAR dst: BlockDescriptor;  ch: CHAR);
+    CODE 345B
+  END DCH;
+
+  PROCEDURE PaintCursor(x,y: INTEGER);
+  BEGIN
+    IF (x < CursorWidth) OR (y < CursorHeight) THEN
+      IF (x < BMWidth-CursorWidth) & (y < BMHeight-CursorHeight) THEN
+        cursor.x := x; cursor.y := y;
+        REPL(invert, BMD, CursorPat1, cursor)
+      END
+    ELSE
+      cursor.x := x-CursorWidth; cursor.y := y-CursorHeight;
+      REPL(invert, BMD, CursorPat0, cursor)
+    END
+  END PaintCursor;
+ 
+  PROCEDURE PaintRectangle(k,x,y,w,h: INTEGER);
+  BEGIN y := y - Yorg;
+    IF x < 0 THEN w := w+x; x := 0 END ;
+    IF x+w >= BMWidth THEN w := BMWidth - x END ;
+    IF y < 0 THEN h := h+y; y := 0 END ;
+    IF y+h >= BMHeight THEN h := BMHeight - y END ;
+    IF (w > 0) & (h > 0) THEN
+      blk.x := x; blk.y := y; blk.w := w; blk.h := h;
+      REPL(replace, BMD, pat[k], blk)
+    END
+  END PaintRectangle;
+ 
+  PROCEDURE WriteString(x,y: INTEGER; f: CARDINAL;
+            VAR s: ARRAY OF CHAR; i: CARDINAL);
+    VAR W: INTEGER;
+  BEGIN y := y - Yorg; W := FontWidth[f];
+    IF (x >= 0) & (x+W < BMWidth) &
+       (y >= 0) & (y+FontHeight[f] < BMHeight) THEN
+      blk.w := BMWidth - x; blk.x := x; blk.y := y;
+      WHILE (s[i] # 0C) & (blk.w > W) DO
+        DCH(BMD, font[f], blk, s[i]);  INC(i)
+      END
+    END 
+  END WriteString;
+ 
+  PROCEDURE ShowChar(ch: CHAR; f: CARDINAL; VAR x,y: INTEGER);
+  BEGIN blk.x := x; blk.y := y - Yorg;
+    IF blk.y + FontHeight[f] > BMHeight THEN
+      blk.y := BMHeight - FontHeight[f]; y := blk.y + Yorg
+    END ;
+    IF blk.x + FontWidth[f] < BMWidth THEN
+      DCH(BMD, font[f], blk, ch); x := blk.x
+    END
+  END ShowChar;
+
+  PROCEDURE PaintMenu(x,y,n: INTEGER; s: ARRAY OF CHAR);
+    VAR i: CARDINAL; H: INTEGER;
+
+    PROCEDURE Rec(m: CARDINAL; x,y,w,h: INTEGER);
+    BEGIN blk.x := x+XM; blk.y := y+YM; blk.h := h; blk.w := w;
+      REPL(replace, BMD, pat[m], blk)
+    END Rec;
+
+  BEGIN H := n*FontHeight[0] + 4; SaveBlk.h := H;
+    IF x < 0 THEN XM := 0
+      ELSIF x > BMWidth - MenuWidth THEN XM := BMWidth - MenuWidth
+      ELSE XM := x
+    END ;
+    IF y < 0 THEN YM := 0
+      ELSIF y > BMHeight - H THEN YM := BMHeight - H
+      ELSE YM := y
+    END ;
+    blk.x := XM; blk.y := YM; blk.w := MenuWidth; blk.h := H;
+    BBLT(replace, SaveBMD, blk, SaveBlk, BMD);
+    Rec(3, 0, 0, MenuWidth, H);
+    Rec(0, 0, 0, MenuWidth, 2);
+    Rec(0, 0, H-2, MenuWidth, 2);
+    Rec(0, 0, 0, 2, H);
+    Rec(0, MenuWidth-2, 0, 2, H);
+    i := 0; H := YM+2;
+    REPEAT blk.x := XM+2; blk.y := H;
+      blk.w := MenuWidth-4; blk.h := FontHeight[0];
+      REPEAT DCH(BMD, font[0], blk, s[i]); i := i+1
+      UNTIL s[i] = "|";
+      H := H + FontHeight[0]; i := i+1
+    UNTIL s[i] = "|"
+  END PaintMenu;
+
+  PROCEDURE RestoreMenuArea;
+  BEGIN
+    blk.x := XM; blk.y := YM; blk.w := MenuWidth; blk.h := SaveBlk.h;
+    BBLT(replace, BMD, SaveBlk, blk, SaveBMD)
+  END RestoreMenuArea;
+
+  PROCEDURE InvertMenuField(n: INTEGER);
+  BEGIN
+    blk.x := XM+2; blk.y := YM + n*FontHeight[0] +2;
+    blk.w := MenuWidth-4; blk.h := FontHeight[0];
+    REPL(invert, BMD, pat[0], blk)
+  END InvertMenuField;
+
+  PROCEDURE UpLow(up: BOOLEAN);
+  BEGIN 
+    IF up THEN Yorg := PageHeight - BMHeight ELSE Yorg := 0 END
+  END UpLow;
+ 
+  PROCEDURE SetTicks;
+  BEGIN 
+    REPL(paint, BMD, TickPat, allmap)
+  END SetTicks;
+
+  PROCEDURE ClearTicks;
+  BEGIN 
+    REPL(erase, BMD, TickPat, allmap)
+  END ClearTicks;
+
+  PROCEDURE ClearMap;
+  BEGIN 
+    REPL(erase, BMD, pat[0], allmap)
+  END ClearMap;
+
+  PROCEDURE LoadFont(f: CARDINAL; fName: ARRAY OF CHAR; VAR ok: BOOLEAN);
+    CONST BufSize = 1024;
+    VAR L,H,W, a,i,n, sum: CARDINAL;
+      buf: ARRAY [0..BufSize-1] OF CARDINAL;
+      ff: File;
+  BEGIN Lookup(ff, fName, FALSE);
+    IF ff.res = done THEN
+      ReadWord(ff, L); ReadWord(ff, sum);
+      ReadWord(ff, H); FontHeight[f] := INTEGER(H MOD 400B);
+      ReadWord(ff, W); FontWidth[f] := ABS(INTEGER(W));
+      Allocate(font[f], L-4); a := 0;
+      IF font[f] # nil THEN
+        TrapsOff; sum := L+sum+H+W; L := L-4; 
+        WHILE L > 0 DO
+          IF L >= BufSize THEN n := BufSize ELSE n := L END ;
+          i := 0;
+          REPEAT ReadWord(ff,W); buf[i] := W; sum := sum + W; i := i+1
+          UNTIL i = n;
+          MOVF(font[f], a, 0, ADR(buf), n); a := a+n; L := L-n
+        END ;
+        TrapsOn; Close(ff);
+        IF sum # 0 THEN ok := FALSE END
+      ELSE ok := FALSE (*no space*)
+      END
+    ELSE ok := FALSE (*no file*)
+    END
+  END LoadFont;
+
+BEGIN Yorg := 0; BMWidth := ScreenWidth(); BMHeight := ScreenHeight();
+  Allocate(SaveBMA, ((MenuWidth+15) DIV 16) * MenuHeight);
+  BuildBMD(SaveBMA, MenuWidth, MenuHeight, SaveBMD);
+  WITH SaveBlk DO
+    x := 0; y := 0; w := MenuWidth; h := MenuHeight
+  END ;
+  WITH CursorPat0 DO length := CursorHeight;
+    w[ 0] := {8..15};       w[ 1] := {9..15};    w[ 2] := {10..15};
+    w[ 3] := {10..15};      w[ 4] := {9..15};    w[ 5] := {8..15};
+    w[ 6] := {7..11,14,15}; w[ 7] := {6..10,15}; w[ 8] := {5..9};
+    w[ 9] := {4..8};        w[10] := {3..7};     w[11] := {2..6};
+    w[12] := {1..5};        w[13] := {2..4};     w[14] := {3};
+    w[15] := {}
+  END ;
+  WITH CursorPat1 DO length := CursorHeight;
+    w[ 0] := {};         w[ 1] := {12};    w[ 2] := {11..13};
+    w[ 3] := {10..14};   w[ 4] := {9..13}; w[ 5] := {8..12};
+    w[ 6] := {7..11};    w[ 7] := {6..10}; w[ 8] := {0,5..9};
+    w[ 9] := {0,1,4..8}; w[10] := {0..7};  w[11] := {0..6};
+    w[12] := {0..5};     w[13] := {0..5};  w[14] := {0..6};
+    w[15] := {0..7}
+  END ;
+  cursor.w := CursorWidth; cursor.h := CursorHeight;
+  WITH TickPat DO
+    length := 16; w[15] := {0}; i := 0;
+    REPEAT w[i] := {}; INC(i) UNTIL i = 15
+  END ;
+  WITH pat[0] DO
+    length := 1; w[0] := {0..15}
+  END ;
+  WITH pat[1] DO  (*dark gray*)
+    length := 2; w[0] := {0,2,4,6,8,10,12,14};
+    w[1] := {1,3,5,7,9,11,13,15}
+  END ;
+  WITH pat[2] DO  (*light gray*)
+    length := 4; w[0] := {0,4,8,12}; w[1] := {};
+    w[2] := {2,6,10,14}; w[3] := {}
+  END ;
+  WITH pat[3] DO
+    length := 1; w[0] := {}
+  END ;
+  WITH allmap DO
+    x := 0; y := 0; w := BMWidth; h := BMHeight
+  END ;
+END SilDisplay.

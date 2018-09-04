@@ -1,0 +1,85 @@
+A c
+Some Remarks to the Lilith Handbook
+C Y15 c
+LG 26.04.82,  revised 13.05.82
+w30 +
+The Lilith handbook will be written with 1zeus/skylla0 formatting commands.  To get a more or less 1uniform0 style, some conventions should be considered, when writing a contribution to the handbook.
+w20 +
+1Titles0
+x25
+-  The first word in a title starts with a capital.  The same do the further "important" words within the title.  There is one exception to this rule:  Program names are written as they must be typed when the programs are called.
+
+-  If a title is numbered, a dot must follow each number.  Between the number and the text 1two0 blanks must be inserted.
+
+-  1Chapter0 titles are formatted with macro 2A0 and they are centered.  A new chapter will start on a new page.  Therefore, insert the following command in front of a chapter title: 7A c0
+A c Y2
+4.  Things to Know
++ x25
+-  1Subchapter0 titles are formatted with macro 2B0.  They are written at left and separated from the preceding text by a space of 20 dot lines.  Therefore, insert the following command in front of a subchapter title: 7B Y200
+B x50 Y2
+4.2.  File Names
++ x25
+-  1Sub-subchapter0 titles are formatted with macro 2C0.  They are written at left and separated from the preceding text by a space of 15 dot lines.  Therefore, insert the following command in front of a subchapter title: 7C Y150
+C x50 Y2
+4.2.2.  File Name Extensions
++ x25
+-  Unnumbered titles may be separated from the preceding text by a space of 15 dot lines, e.g. with a command 7w150.  They are usually written in the 1italic0 font (1).  
+
+-  Some special rules are valid for titles belonging to 1utility program0 and 1library module0 descriptions, i.e. chapters 6. and 11.  The title for a utility program chapter merely consists of the name which must be typed to call a program.
+B x50 Y2
+6.1.  directory
++ x25 Y2
+The title for a library module chapter merely consists of the module name.
+B x50 Y2
+11.3.  Options
++ w15
+1Macros and Fonts0
+x25
+-  Use macro 2+0 for normal text with TIMESROMAN font.  Font changes to fonts 1 1italic0, 2 2bold0, 6 6HELVETICA0, and 7 7GACHA0 are possible within the text.
++ x25
+-  Use macro 2=0 and indentation 2x250 for 1program texts0 and 1text on screen0.  We will use a "slimmed" GACHA-font.
+= x50 Y2
+PROCEDURE Write(ch: CHAR); 
++ w15
+1Formats0
+x25
+-  Sentences should be separated by 1two0 blanks.
+
+-  We will use strict 1indentation0 in steps of 25 dots, i.e. 2x250, 2x500, 2x750, and so on.
+
+-  For the lack of an 1undentation0 facility in zeus, we will represent tables as follows:
+x50
+-  1Key word0 on a first line (e.g font 2, indentation 25)
+
+-  Following text on the next line with indentation.  To prohibit a paragraph separation, it is possible to reduce the 1paragraph-space0 to a 1line-space0 with the command 2Y20 (e.g. normal font, indentation 50, paragraph-space 2).  Do not forget to set it back afterwards (e.g. with macro +).
+
+1Example0:  Program option list
++ x75
+2NOAlpha0
+x100 Y2
+Information is listed in the order of the directory.  1Default0.
++ x75
+2Equal0
+x100 Y2
+Capital and lower case letters are treated as equal.
++ x25
+-  1Keys0 and 1(control) characters0 should be written in capitals.  For example: 2RETURN0, 2ESC0, 2CTRL-C0.
++ w15
+1Author and Date0
+x25
+-  Author and date are the first information after a title.  They are written in one line:  First the author's name, followed by the date.  Name and date are separated by two blanks.  If the preceding title is centered, name and date are centered as well and written in the 2bold0 font (2).  Use the command 7C Y15 c0
+C Y2 c
+Leo Geissmann  13.5.82
++ x25 Y2
+If the preceding title is at the left, name and date are written in normal font at left.  Use the command 7+0
++ x50 Y2
+Leo Geissmann  13.5.82
++ w15
+1Miscellaneous0
+x25
+-  A definition module should contain in the first line a comment with a date and the name of the author.
+= x50
+DEFINITION MODULE RandomNumbers;  (* LG 26.04.82 *)
+  EXPORT QUALIFIED ....
++ x25
+-  Besides of the definition module, a library module description should also contain a list of the separate modules, which are imported by the implementation.  This is very important, if there exist modules which do not work together.

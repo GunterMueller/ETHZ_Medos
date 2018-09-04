@@ -1,0 +1,1481 @@
+A c
+9.  The Medos-2 Interface
+C Y15 c
+Svend Erik Knudsen  15.5.82
++
+This chapter describes the interface to the Medos-2 operating system.  It contains the following modules:
+x25 t170 450.
+FileSystem  Standard module for the use of files  9.1.
+Program  Facilities for the execution of programs upon Medos-2  9.2.
+Storage  Standard module for storage allocation in the heap 9.3.
+Terminal  Standard module for sequential terminal input/output  9.4.
+p Ac
+9.1.  Module FileSystem
+Cc
+Svend Erik Knudsen  15.5.82
+B Y20
+9.1.1.  Introduction
++
+A (Medos-2) file is a sequence of bytes stored on a certain
+medium.  Module 1FileSystem0 is the interface the normal
+programmer should know in order to use files.
+ The definition module is listed in chapter 9.1.2.  The
+explanations needed for simple usage of sequential (text or
+binary) files are given in chapter 9.1.3.  More demanding users of
+files should also consult chapter 9.1.4.  The file system supports
+several implementations of files.  At execution time a program may
+declare that it implements files on a certain
+named medium.  How this is achieved is mentioned
+in chapter 9.1.5.  On Lilith the 10 Mbyte cartridge
+for the Honeywell Bull
+D120/D140 disk drive is the standard medium for files.  Some
+characteristics and restrictions of the current implementation,
+as well as a list of possible
+error messages, are given in chapter 9.1.6.
+B Y20
+9.1.2.  Definition Module FileSystem
+ = x 25
+DEFINITION MODULE FileSystem;    (* Medos-2 V4  S. E. Knudsen  1.6.81 *)
+
+  FROM SYSTEM IMPORT ADDRESS, WORD;
+
+  EXPORT QUALIFIED
+    File, Response,
+    Create, Close, Lookup, Rename, 
+    ReadWord, WriteWord, ReadChar, WriteChar,
+    Reset, Again, SetPos, GetPos, Length,
+    Command, MediumType, FileCommand, DirectoryCommand,
+    Flag, FlagSet,
+    SetRead, SetWrite, SetModify, SetOpen, Doio, 
+    FileProc, DirectoryProc, CreateMedium, RemoveMedium;
+    
+     
+  TYPE
+    MediumType    = ARRAY [0..1] OF CHAR; 
+    MediumHint;
+    Flag          = (er, ef, rd, wr, ag, bytemode);
+    FlagSet       = SET OF Flag;
+
+    Response      = (done, notdone, notsupported, callerror,
+                     unknownmedium, unknownfile, paramerror,
+                     toomanyfiles, eom, deviceoff,
+                     softparityerror, softprotected,
+                     softerror, hardparityerror,
+                     hardprotected, timeout, harderror);
+ 
+    Command       = (create, open, close, lookup, rename,
+                     setread, setwrite, setmodify, setopen,
+                     doio,
+                     setpos, getpos, length,
+                     setprotect, getprotect,
+                     setpermanent, getpermanent,
+                     getinternal);
+ 
+    File          = RECORD
+                      bufa: ADDRESS;
+                      ela: ADDRESS; elodd: BOOLEAN;
+                      ina: ADDRESS; inodd: BOOLEAN;
+                      topa: ADDRESS;
+                      flags: FlagSet;
+                      eof: BOOLEAN;
+                      res: Response;
+                      CASE com: Command OF
+                        create, open, getinternal:
+                          fileno, versionno: CARDINAL
+                      | lookup: new: BOOLEAN
+                      | setpos, getpos, length: highpos, lowpos: CARDINAL
+                      | setprotect, getprotect: wrprotect: BOOLEAN
+                      | setpermanent, getpermanent: on: BOOLEAN
+                      END;
+                      mt: MediumType; mediumno: CARDINAL;
+                      mh: MediumHint;
+                      submedium: ADDRESS; 
+                    END;
+
+ 
+  PROCEDURE Create(VAR f: File;  mediumname: ARRAY OF CHAR);
+  PROCEDURE Close(VAR f: File);
+
+  PROCEDURE Lookup(VAR f: File; filename: ARRAY OF CHAR; new: BOOLEAN);
+  PROCEDURE Rename(VAR f: File; filename: ARRAY OF CHAR);
+
+  PROCEDURE ReadWord(VAR f: File; VAR w: WORD);
+  PROCEDURE WriteWord(VAR f: File; w: WORD);
+  PROCEDURE ReadChar(VAR f: File; VAR ch: CHAR);
+  PROCEDURE WriteChar(VAR f: File; ch: CHAR);
+ 
+  PROCEDURE Reset(VAR f: File);
+  PROCEDURE Again(VAR f: File);
+  PROCEDURE SetPos(VAR f: File; highpos, lowpos: CARDINAL);
+  PROCEDURE GetPos(VAR f: File; VAR highpos, lowpos: CARDINAL);
+  PROCEDURE Length(VAR f: File; VAR highpos, lowpos: CARDINAL);
+ 
+  PROCEDURE FileCommand(VAR f: File);
+  PROCEDURE DirectoryCommand(VAR f: File; filename: ARRAY OF CHAR);
+
+  PROCEDURE SetRead(VAR f: File);
+  PROCEDURE SetWrite(VAR f: File);   
+  PROCEDURE SetModify(VAR f: File); 
+  PROCEDURE SetOpen(VAR f: File); 
+  PROCEDURE Doio(VAR f: File);
+
+ 
+  TYPE
+    FileProc      = PROCEDURE (VAR File); 
+    DirectoryProc = PROCEDURE (VAR File, ARRAY OF CHAR); 
+ 
+  PROCEDURE CreateMedium(mt: MediumType; mediumno: CARDINAL;
+                         fp: FileProc; dp: DirectoryProc; VAR done: BOOLEAN); 
+  PROCEDURE RemoveMedium(mt: MediumType; mediumno: CARDINAL;
+                         VAR done: BOOLEAN);
+
+END FileSystem.
+ p B
+9.1.3.  Simple Use of Files
+C Y15
+9.1.3.1.  Opening, Closing, and Renaming of Files
++
+A file is either 1permanent0 or 1temporary0.  A permanent file
+remains stored on its medium after it is closed and normally
+has an external (or symbolic) name.  A temporary file is removed
+from the medium as soon as it is no longer referenced by a program,
+and normally it is nameless.
+ Within a program, a file is referenced
+by a variable of type 1File0.  From the programmer's
+point of view, the variable of type 1File0 simply is the file.
+ Several routines connect a file variable to an actual file (e.g. on
+a disk).  The actual file either has to be 1created0 on a
+named medium or 1looked up0 by its file name.  The syntax of 1medium
+name0 and 1file name0 is
+= x25
+medium name  = [ identifier ] .
+identifier   = letter { letter | digit } .
+
+file name    = medium name [ "." local name ] .
+local name   = identifier { "." identifier } .
++ x0
+Capital and lower case letters are treated as being
+different.  The medium name is
+the name of the medium, upon which a file is (expected to be) stored.  The
+local name is the name of the file on a specific medium. The last
+(and maybe the only) identifier within a local file name is often
+called the 1file name extension0 or simply 1extension0.  The file system
+does, however, 1not0 treat file name
+extensions in a special way.
+ Many programs and users use the extensions to classify files according
+to their content and treat extensions in a special way (e.g.
+assume defaults, change them automatically, etc.).
+n x25
+DK.SYS.directory.OBJ
++ x0
+File name of file 1SYS.directory.OBJ0 on medium 1DK0.  Its extension is 1OBJ0.
++ t 200. w15
+Create(f, mediumname)
+ + x25 Y2
+Procedure 1Create0 creates a new temporary (and nameless)
+file on the given medium.  After the call
+n Y4
+f.res = done if file f is created,
+f.res = ... if some error occured.
++ w15
+Close(f)
+x25 Y2
+Procedure 1Close0 terminates any actual input or output
+operation on file f and disconnects the variable f from
+the actual file.  If the actual file is temporary, 1Close0
+also deletes the file.
++ w15
+Lookup(f, filename, new)
+x25 Y2
+Procedure 1Lookup0 looks for the actual file with the given
+file name.  If the file exists, it is connected to f (opened).
+ If the requested file is not found and new is TRUE, a permanent
+file is created with the given name.  After the call
+n Y4
+f.res = done if file f is connected,
+f.res = notdone if the named file does not exist,
+f.res = ... if some error occured.
+
+If file f is connected, the field f.new indicates:
+Y4
+f.new = FALSE File f existed already
+f.new = TRUE File f has been created by this call
++ w15
+Rename(f, filename)
+x25 Y2
+Procedure 1Rename0 changes the name of file f to filename.  If
+filename is empty or contains only the medium name,  f  is
+changed to a temporary and nameless file.  If filename
+contains a local name, the actual file will be permanent
+after a successful call of 1Rename0.  After the call
+n Y4
+f.res = done if file f is renamed,
+f.res = notdone if a file with filename already exists,
+f.res = ... if some error occured.
++ f1 w15
+Related Module
++
+Module 1FileNames0 makes it easier to read file names from the keyboard (i.e. from
+module 1Terminal0, see chapter 9.4.) and to handle defaults (see chapter 11.11.).
+C Y15
+9.1.3.2.  Reading and Writing of Files
++
+At this level of programming, we consider a file to be either a
+sequence of characters (text file) or a sequence of words
+(binary file), although this is 1not0 enforced by the file
+system.  The first called routine causing any input
+or output on a file (i.e. ReadChar, WriteChar, ReadWord, WriteWord)
+determines whether the file is to be considered as a text or a binary
+file.
+
+Characters read from and written to a text file are from the
+ASCII set.  Lines are terminated by character 36C (= 1eol, RS0).
+t 200. w15
+Reset(f)
+ + x25 Y2
+Procedure 1Reset0 terminates any actual input or output and
+sets the 1current position0 of file f to the beginning of f.
++ w15
+WriteChar(f, ch), WriteWord(f, w)
+x25 Y2
+Procedure 1WriteChar0 (1WriteWord0) appends character ch
+(word w) to file f.
++ w15
+ReadChar(f, ch), ReadWord(f, w)
+x25 Y2
+Procedure 1ReadChar0 (1ReadWord0) reads the next character (word)
+from file f and assigns it to ch (w).  If 1ReadChar0 has been called without success, 0C
+is assigned to ch.  1f.eof0 implies 1ch = 0C0.  The opposite,
+however, is 1not0 true: 1ch = 0C0 does 1not0 imply
+1f.eof0.  After the call
++ x25 n Y4
+f.eof = FALSE ch (w) has been read
+f.eof = TRUE Read operation was not successful
+
+If f.eof is TRUE:
+Y4
+f.res = done 1End of file0 has been reached
+f.res = ...  Some error occured
++ w15
+Again(f)
+x25 Y2
+A call of procedure 1Again0 prevents a following call to
+procedure 1ReadChar0 (1ReadWord0) from reading the next
+character (word) on file f.  Instead, the character (word)
+read just before the call of 1Again0 will be read again.
++ f1 w15
+Implementation Note
++
+The current versions of the routines 1ReadWord0 and 1WriteWord0 do not support
+reading and writing of words at odd positions (for more information on 1current position0, see 9.1.3.3).
++ f1 w15
+Related Modules
++
+Module 1ByteIO0 provides routines for reading and writing of bytes on files.
+ This is valuable for the packing of information on files, if it is
+known that the ordinal values of the transferred elements are in the range 0 .. 255.
+
+Module 1ByteBlockIO0 makes it easier (and more efficient) to transfer elements
+of any given type (size).  This module also transfers words correctly if
+the current position of the file is odd (see note above)!
+C Y15
+9.1.3.3.  Positioning of Files
++
+All input and output routines operate at the 1current position0
+of a file.  After a call to 1Lookup0, 1Create0 or 1Reset0,
+the current position of a file is at its beginning.  Most of the
+routines operating upon a file change the current position of
+the file as a normal part of their action.  Positions are encoded
+into 1long cardinals0, and a file is positioned at its
+beginning, if its current position is equal to zero.  Each call
+to a procedure, which reads or writes a character (a word) on a
+file, increments the current file position by 1 (2) for each
+character (word) transferred.  A character (word) is stored in 1
+(2) byte(s) on a file, and the position of the element is the
+number of the (first) byte(s) holding the element.  By aid of
+the procedures 1GetPos0, 1Length0 and 1SetPos0 it is possible to
+get the current position of a file, the position just behind the
+last element in the file, and to change explicitly the current
+position of a file.
+ a t 200. w15
+SetPos(f, highpos, lowpos)
++ x25 Y2
+A call to procedure 1SetPos0 sets the current position of
+file f to 1highpos * 2**16 + lowpos0.  The new position must be less or equal
+the length of the file.  If the last operation
+before the call of 1SetPos0 was a write operation (i.e. if
+file f is in the writing state), the file is cut at its new
+current position, and the elements from current position to the
+end of the file are lost.
++ w15
+GetPos(f, highpos, lowpos)
+x25 Y2
+Procedure1GetPos0 returns the current file position.  It is
+equal to 1highpos * 2**16 + lowpos0.
++ w15
+Length(f, highpos, lowpos)
++ x25 Y2
+Procedure 1Length0 gets the position just behind the last
+element of the file (i.e. the number of bytes stored on the
+file).  The position is equal to 1highpos * 2**16 + lowpos0.
+C Y15
+9.1.3.4.  Examples
++
+Writing a Text File
+= x25
+.
+VAR
+  f: File;
+  ch: CHAR; endoftext: BOOLEAN;
+.
+.
+Lookup(f, "DK.newfile", TRUE);
+IF (f.res <> done) OR NOT f.new THEN
+  (* f was not created by this call to "Lookup" *)
+  IF f.res = done THEN Close(f) END
+ELSE
+  LOOP
+    (* find next character to write --> endoftext, ch *)
+    IF endoftext THEN EXIT END;
+    WriteChar(f, ch)
+  END;
+  Close(f)
+END
+.
+.
++
+Reading a Text File
+= x25
+.
+VAR
+  f: File;
+  ch: CHAR;
+.
+.
+Lookup(f, "DK.oldfile", FALSE);
+IF f.res <> done THEN
+  (* file not found *)
+ELSE
+  LOOP
+    ReadChar(f, ch);
+    IF f.eof THEN EXIT END;
+    (* use ch *)
+  END;
+  Close(f)
+END
+.
+.
+ p B
+9.1.4.  Advanced Use of Files
+C Y15
+9.1.4.1.  The Procedures FileCommand and DirectoryCommand
++
+In the previous sections, the file variable served,
+with few exceptions,
+simply as a reference to a file.
+ The exceptions were the fields 1eof0, 1res0 and 1new0
+within a file variable.
+ Generally, however, all operations on a file are implemented by
+either inspecting or changing fields within the file variable
+directly and/or by encoding the needed operation (1command0) into
+the file variable followed by a call to either routine 1FileCommand0 or
+1DirectoryCommand0.  1Commands0 requiring (part of) a filename
+as parameter are executed by 1DirectoryCommand0, all
+others by 1FileCommand0.  An implementation of
+1SetPos0 and 1Lookup0 should illustrate this:
+= x25
+PROCEDURE SetPos(VAR f: File; highpos, lowpos: CARDINAL);
+BEGIN
+  f.com := setpos;
+  f.highpos := highpos; f.lowpos := lowpos;
+  FileCommand(f);
+END SetPos;
+
+PROCEDURE Lookup(VAR f: File; filename: ARRAY OF CHAR; new: BOOLEAN);
+BEGIN
+  f.com := lookup;
+  f.new := new;
+  DirectoryCommand(f, filename)
+END Lookup;
++
+The commands 1lookup0 and 1rename0 must be executed by
+1DirectoryCommand0, other commands may be executed either by
+1FileCommand0 or by 1DirectoryCommand0.  Unless the command is
+1lookup0 or 1rename0, a call to 1DirectoryCommand0 will be converted by the
+file system to a call to 1FileCommand0.  This
+facility is only useful for the commands 1create0 and 1open0 (see also 9.1.4.2).
+
+Below is a list of all commands and a reference to the section where each is explained:
+x25 t150 400n.
+2create0 create a new temporary (and nameless) file (9.1.3.1)
+2open0 open an existing file by 1IFI0 (9.1.4.2)
+2close0 close a file (9.1.3.1)
+2lookup0 look up (or create) a file by file name (9.1.3.1)
+2rename0 rename a file (9.1.3.1)
+2setread0 set a file into state 1reading0 (9.1.4.5)
+2setwrite0 set a file into state 1writing0 (9.1.4.5)
+2setmodify0 set a file into state 1modifying0 (9.1.4.5)
+2setopen0 set a file into state 1opened0 (9.1.4.5)
+2doio0 get next buffer (9.1.4.5)
+2setpos0 change the 1current position0 of the file (9.1.3.3)
+2getpos0 get the 1current position0 of the file (9.1.3.3)
+2length0 get the 1length0 of the file (9.1.3.3)
+2setprotect0 change the 1protection0 of the file (9.1.4.4)
+2getprotect0 get the current 1protection0 of the file (9.1.4.4)
+2setpermanent0 change the 1permanency0 of the file (9.1.4.3)
+2getpermanent0 get the 1permanency0 of the file (9.1.4.3)
+2getinternal0 get the 1LFI0 of the file (9.1.4.2)
++
+After the execution of a command, field 1res0 of the file reflects
+the success of the operation.  Other fields of the file variable might,
+however, contain additional return values, depending on the executed command
+and the 1state0 of the file (see 9.1.4.5).  Here, the normal way of
+setting the fields before a return from procedure 1FileCommand0 is given:
+= x25
+WITH f DO
+  (* set other fields *)
+  res := "...";
+  flags := flags - FlagSet{er, ef, rd, wr};
+  IF "state = opened" (* see 9.1.4.5 *) THEN
+    bufa  := NIL;                 (* no buffer assigned *)
+    ela   := NIL; elodd := FALSE;
+    ina   := NIL; inodd := FALSE;
+    topa  := NIL;
+    eof   := TRUE
+  ELSE
+    bufa  := ADR("buffer");       (* buffer at current position of file *)
+    ela   := ADR("word in buffer at current position");
+    elodd := ODD("current position");
+    ina   := ADR("first not (completely) read word in buffer");
+    inodd := "word at ina contains one byte";
+    topa  := ADR("first word after buffer");
+    eof   := "current position = length";
+    IF "(state = reading) OR (state = modifying)" THEN INCL(flags, rd) END;
+    IF "(state = writing) OR (state = modifying)" THEN INCL(flags, wr) END;
+    IF elodd OR ODD("length") THEN INCL(flags, bytemode) END;
+  END;
+  IF res <> done THEN eof := TRUE; INCL(flags, er) END;
+  IF eof THEN INCL(flags, ef) END
+END
++ x0
+The 1states0 of a file and the file buffering are explained in 9.1.4.5.  The field 1flags0
+enables a simple (and therefore efficient) test of the state of the file, whenever it
+is accessed.  The "flag" 1ag0 is set by routine 1Again0 and cleared by read routines.
+C Y15
+9.1.4.2.  Internal File Identification and External File Name
++
+All files supported by the file system have a unique identification,
+the so called 1internal file identification (IFI)0 and might also have
+an external (or symbolic) 1file name0.
+
+Both the internal file identification and the file name consist of two parts, namely
+a part identifying the medium upon which a file is (expected to be) stored, and
+a part identifying the file on the selected medium.
+
+The two parts of an internal file identification are called the 1internal medium identification (IMI)0 and
+the 1local file identification (LFI)0.  The two parts of a file name are called the
+1medium name0 and the 1local file name0.
+
+The IFI of a connected (opened) file may be obtained at any time:
+ The IMI is always stored in the fields 1mt0 and 1mediumno0 of the file variable.
+ The LFI is stored in the fields 1fileno0 and 1versionno0 after the execution
+of command 1create0 or 1getinternal0.
+x0
+A file f can be opened, if it exists and its IFI is known:
+= x25
+f.mt := ...; f.mediumno := ...;
+f.fileno := ...; f.versionno := ...;
+f.com := open;
+FileCommand(f)
++
+The identification of a file by a user selected or computed name (a string) is
+however both commonly accepted and convenient.  The syntax of a 1file name0
+is given in 9.1.3.1.  The routines 1Create, Lookup, Rename0 and 1DirectoryCommand0
+all have a parameter specifying the file name. 
+
+If the 1medium name0 is contained
+in the file name, it is "converted" into an IMI and stored into the file variable,
+except when the rename command is used.  In this case, the "converted" IMI is checked against
+the IMI stored in the file variable.  If the medium name is missing in the actual
+file name parameter, it is assumed that the corresponding IMI is already stored
+in the file variable.
+
+The 1local file name0 part of the file name will be handled by the
+routine implementing 1DirectoryCommand0 for the medium given by the IMI
+(see also 9.1.5.). 
++ f1 w15
+Implementation Notes
++
+The current version of module 1FileSystem0 supports only 1medium names0 according
+to the following syntax:
+x25 f7
+medium name = letter [ letter ] { digit } .
++
+When a 1medium name0 is "converted" to an 1internal medium identification0, the
+letter(s) is (are) copied to the 1MediumType0 part (field 1mt0), and the
+digits are considered as a decimal number whose value is assigned to the 1medium number0 part (field 1mediumno0).
+ If the medium name contains no digits, medium number 65535 (=177777B) is assumed.
+x25 f7 n
+"DK"      =>   ( "DK", 65535)
+"DK0"     =>   ( "DK", 0)
+"DK007"   =>   ( "DK", 7)
+C Y15
+9.1.4.3.  Permanency of Files
++
+As explained in 9.1.3.1, a file is either 1temporary0 or 1permanent0.  The rule is that,
+when a file is closed (explicitly, implicitly, or in a
+system crash), a temporary file is deleted and a permanent file will remain
+on the medium for
+later use.  Normally, a "nameless" file is temporary,
+and a "named" file is permanent.  It is, however, possible to control the permanency
+of a file explicitly.  This is useful, if for some reason, it is better to reference
+a file by its IFI instead of its file name (e.g. in data base systems,
+other directory systems).
++ w15
+Set File Permanent
+= x25
+f.on := TRUE; f.com := setpermanent;
+FileCommand(f)
++ w15
+Set File Temporary
+= x25
+f.on := FALSE; f.com := setpermanent;
+FileCommand(f)
++ w15
+Get File Permanency
+= x25
+f.com := getpermanent;
+FileCommand(f);
+
+(* f.on = TRUE if and only if f is permanent *)
+C Y15
+9.1.4.4.  Protection of Files
++
+A file can be protected against any changes only (length, information, name etc.).
+ The only exception to this rule is, of course, that the protection of a protected file
+may be changed.
++ w15
+Protect File
+= x25
+f.wrprotect := TRUE; f.com := setprotect;
+FileCommand(f)
++ w15
+Unprotect File
+= x25
+f.wrprotect := FALSE; f.com := setprotect;
+FileCommand(f)
+p +
+Get File Protection
+= x25
+f.com := getprotect;
+FileCommand(f);
+
+(* f.wrprotect = TRUE if and only if f is protected *)
+C Y15
+9.1.4.5.  Reading, Writing, and Modifying Files
++
+A file can be in one of four possible 1I/O states0 (or simply, 1states0), namely
+in state 1opened0, 1reading0, 1writing0 or 1modifying0.  Just after a file
+has been connected (e.g. by a call to procedure 1Create0), a file is in state
+opened, and its current position is zero.  The state of a file can only be changed by
+a direct or indirect call to one of the routines 1SetOpen0, 1SetRead0, 1SetWrite0, and 1SetModify0
+or by executing one of the commands 1setopen0, 1setread0, 1setwrite0, and
+1setmodify0.  The actual state of a file may be inspected in field 1flags0
+of the file:
+x25 t150.
+2opened0 flags * FlagSet{rd, wr} = FlagSet{}
+2reading0 flags * FlagSet{rd, wr} = FlagSet{rd}
+2writing0 flags * FlagSet{rd, wr} = FlagSet{wr}
+2modifying0 flags * FlagSet{rd, wr} = FlagSet{rd, wr}
++
+The buffers needed for the transfer of data to and from files are supplied and managed by
+the file system.  The changes of a file's I/O state and normally the command 1doio0 (or procedure 1Doio0 resp.) control the system's buffering.  The commands 1setread0, 1setwrite0, 1setmodify0, 1setopen0, and 1doio0
+(and the corresponding routines) do, however, 1not0 change the 1current position0 of a file as a
+side effect.
+
+In state 1opened0, no buffer is assigned to a file (seen from a user's point
+of view).  Any internal buffer with new or changed information has been written back
+onto the medium on which the file is physically stored.  The addresses describing
+the buffer in the file variable (1bufa, ela, ina0, and 1topa0) are all equal to
+NIL.  Any written or changed information within a file can therefore be forced out
+(flushed) to the corresponding medium by a call to 1SetOpen0.
+
+In the other three states (1reading, writing0 and 1modifying0), a buffer is
+assigned to the file. The following figure shows how 1bufa, ela, elodd,
+ina, inodd0, and 1topa0 describe the buffer supplied by the system:
+w 250
+x25 t150 n.
+2bufa0  address of the first word of the buffer
+2topa0  address of the first word behind the buffer
+2ina0  address of the first not (completely) read word behind the data read from the file
+2inodd0  TRUE, if the 1last read byte0 is a high order byte
+2ela0  address of the word containing the 1byte at the current position0
+2elodd0  TRUE, if the 1byte at the current position0 is a low order byte
++
+The following two assertions should always hold for 1bufa, ela, ina0, and 1topa0:
+= x25
+bufa <= ela <= topa
+bufa <= ina <= topa
++
+The fields 1bufa, ina, inodd0, and 1topa0 are 1read-only0, as they
+contain information which must never be changed by any user of a file.
+
+If the file is not in state 1opened0, the byte at the current position
+will be in the buffer after procedure 1FileCommand0 has been executed.
+ The read information is stored in the buffer between 1bufa0 and 1(ina, inodd)0.
+ The pair 1(ela, elodd)0 always points to the byte at the current position of the file,
+i.e. to the byte (or to the first byte of the element) to read, write, or modify
+next in the file.  If 1(ela, elodd)0 points outside the buffer, and no other
+command has to be executed,
+the byte at the current position can be brought into the buffer by a call to 1Doio0 or
+by the execution of command 1doio0 respectively.
+
+The following two assertions also hold after a call to 1FileCommand0, if the state of the file is 1reading0, 1writing0, or 1modifying0.
+= x25
+(ela, elodd) <= (ina, inodd)
+ela          <  topa
++
+The current position of a (connected) file can only be
+changed by either an (explicit or implicit) execution of command 1setpos0
+or by changing 1ela0 and/or 1elodd0 (implicitly or explicitly).
+ In the latter case of course, the file system
+"knows" the exact value of the current position only after an activation of
+the routine 1FileCommand0.
+n w275
++
+This figure shows how the I/O state of a file is changed when different commands
+are executed.  Commands not shown in the figure do not affect the I/O state of a file.
+ Whenever the
+command 1setopen0 is omitted, the system might execute 1setopen0 before executing
+the following command.
++ t200. w15
+SetOpen(f)
+ + x25 Y2
+A call to 1SetOpen0 flushes all changed buffers assigned to file f, and the
+file is set into state 1opened0.  A call to 1SetOpen0 is needed only if
+it is desirable for some reason to flush the buffers (e.g. within database systems or
+for "replay" files),
+or if the file is in state 1writing0, and it has to be positioned backward without
+truncation.  If
+an I/O error occured since the last time the file was in state 1opened0, this is indicated by field 1res0.  
+Y4 n
+f.res = done Previous I/O operations successful
+f.res = ... An error has occured since the last time the file was in state 1opened0.
+p +
+SetRead(f)
+x25 Y2
+A call to 1SetRead0 sets the file into state 1reading0.  This implies that
+a buffer is assigned to the file and the byte at the current position
+is in the assigned buffer.
++ w15
+SetWrite(f)
+x25 Y2
+A call to 1SetWrite0 sets the file into state 1writing0.  In this state, the
+length of a file is 1always (set)0 equal to its current position, i.e. the file
+is 1always0 written at its end, and the file will
+be 1truncated0, if its current position is set to a value less than its length.
+ A buffer is assigned to the file, and
+the information between the beginning of the buffer and the current position
+(= length) is read into the
+buffer.  Information in the buffer up to the location denoted by 1(ela, elodd)0 is considered
+as belonging to the file and will be written back onto the actual file.
++ w15
+SetModify(f)
+x25 Y2
+A call to 1SetModify0 sets the file into state 1modifying0.  This implies that
+a buffer is assigned to the file and the byte at the current position
+is read into the buffer.  In this state, information in the buffer
+up to 1MAX((ela,elodd), (ina,inodd))0 is considered as belonging to the file
+and will therefore be written back onto the actual file.  The length of the
+file might hereby be increased but never decreased!
++ w15
+Doio(f)
+x25 Y2
+If the state of the file is 1reading, writing0 or 1modifying0, the buffer with
+the byte at current position is assigned to the file after a call to 1Doio0.
+ A call to 1Doio0 is essentially needed, if 1(ela,elodd)0 points outside
+the buffer and no other command has to be executed.
+C Y15
+9.1.4.6.  Examples
++
+Procedure 1Reset(f)0
+= x25
+PROCEDURE Reset(VAR f: File);
+BEGIN
+  SetOpen(f);
+  SetPos(f, 0, 0);
+END Reset;
++ w15
+Write File f
+= x25
+.
+(* assume, that file f is positioned correctly *)
+SetWrite(f);
+WHILE "word to write" DO
+  IF ela = topa THEN Doio(f) END;
+  ela^ := "next word to write";
+  INC(ela);
+END;
+SetOpen(f);
+IF f.res <> done THEN
+  (* some write error occured *)
+END;
+.
++ w15
+Read File f
+= x25
+.
+(* assume, that file f is positioned correctly *)
+SetRead(f);
+WHILE NOT f.eof DO
+  WHILE ela < ina DO
+    "use ela^";
+    INC(ela);
+  END;
+  Doio(f);
+END;
+SetOpen(f);
+IF f.res <> done THEN
+  (* Some read error occured *)
+END;
+.
++ w15
+Procedure 1WriteChar0
+= x25
+PROCEDURE WriteChar(VAR f: File; ch: CHAR);      (* SEK  15.5.82 *)
+
+  PROCEDURE SXB(a: ADDRESS; oddpos: BOOLEAN; ch: CHAR);
+    (* Store indeXed Byte *)
+  CODE 225B END SXB;
+
+BEGIN
+  WITH f DO
+    LOOP
+      IF flags * FlagSet{wr, bytemode, er} <> FlagSet{wr, bytemode} THEN
+        IF er IN flags THEN RETURN END;
+        IF NOT (wr IN flags) THEN
+          IF rd IN flags THEN
+            (* Forbid to change directly from reading to writing! *)
+            res := callerror; eof := TRUE;
+            flags := flags + FlagSet{er, ef}
+          ELSE SetWrite(f)
+          END
+        END;
+        INCL(flags, bytemode) 
+      ELSIF ela >= topa THEN Doio(f)
+      ELSIF elodd THEN
+        SXB(ela, TRUE, ch);
+        INC(ela, TSIZE(WORD)); elodd := FALSE;
+        RETURN
+      ELSE
+        SXB(ela, FALSE, ch);
+        elodd := TRUE;
+        RETURN
+      END
+    END
+  END
+END WriteChar;
+p B
+9.1.5.  Implementation of Files
++
+A program may implement files on a certain medium and make
+these files accessible through the file system (that is, through module 1FileSystem0).
+ This is done with a call to procedure 1CreateMedium0.  The medium which the calling
+module will support, is identified by its 1internal medium identification (IMI)0.  The two
+procedures given as parameters should essentially implement procedure
+1FileCommand (fileproc)0 and  1DirectoryCommand (directoryproc)0 for the
+corresponding medium.  Whenever a command is executed on a file, module 1FileSystem0
+activates the procedure which handles the command for the medium upon which the
+file is (expected to be) stored.  The commands 1lookup0 and 1rename0
+will cause procedure 1directoryproc0 to be called; all other commands will cause
+procedure 1fileproc0 to be called. The string supplied as parameter to procedure
+1directoryproc0 contains only the 1local file name0 part of the original file name.
+ The corresponding IMI is stored in the file variable.  The field 1submedium0 in the
+file variable may be used freely by the module implementing files
+(e.g. as an index into a table of connected files).
+
+After a call to procedure 1RemoveMedium0, the indicated medium is no longer known
+by the file system.  This procedure can, however, be called only from the program which
+"created" the medium.  A medium will automatically be removed, if the program within
+which it was "created" is removed.
+
+As connected
+files should have "lifetimes" like Modula-2 pointers (dynamically created variables),
+a medium should only be declared from an unshared program
+(i.e. if 1SharedLevel() = 1CurrentLevel()0, see module 1Program0, chapter 9.2.).
++ t200. w15
+CreateMedium(mediumtype, mediumnumber, fileproc, directoryproc, done)
++ x25 Y2
+Procedure 1CreateMedium0 announces a new medium to the file system.  1done0 is
+TRUE if the new medium was accepted.
++ w15
+RemoveMedium(mediumtype, mediumnumber, done)
++ x25 Y2
+After a call to 1RemoveMedium0, the given medium is no longer known to the file system.
+ 1done0 is TRUE if the medium was removed.
++ w15 f1
+Implementation Note
++
+Eight is the highest number of media that the current version of module 1FileSystem0
+can support at the same time.
+p B
+9.1.6.  Files on Cartridges for Honeywell Bull D120/D140 Disk Drives
+C Y15
+9.1.6.1.  Main Characteristics and Restrictions
++
+Modules 1DiskSystem0 and 1D140Disk0 implement files on cartridges
+for the Honeywell Bull D120/D140 disk drives.  The main
+characteristics of the current implementation are listed below:
+n x25 t275.
+maximum number of files 768/cartridge
+maximum file length 192 kbyte
+cartridge capacity 9408 kbyte
+typical transfer rates 3 - 30 kbyte/sec
+minimum transfer rate < 10 byte/sec
+maximum transfer rate > 50 kbyte/sec
+local file name length 1 - 24 characters
+maximum number of opened files 14 (16)
+medium name "DK"
+internal medium identification ("DK", 65535)
++ x0
+Each actual file can be connected to 1only one0 file variable at the
+same time.  As long as essentially only a single program runs on the
+machine, this should be acceptable, as it is more an aid
+than a restriction.
+
+The transfer rates depend mostly on the number
+of disk head movements needed for the actual transfer.  The positioning of a file
+for each transfer of one or a few bytes might decrease the transfer rate to
+some few bytes per second.  On the other hand, sequential transfers of
+larger elements (>= 16 byte/element) are performed with the maximum transfer rate
+(50 - 60 kbyte/sec).
+
+Actually 16 files can be connected at the same time.  
+ Module 1DiskSystem0 uses two of them internally for access to the two directories
+on the cartridge.  The remaining 14 files may be used freely by ordinary programs.
+
+The current version of module 1DiskSystem0 does not distinguish between cartridges.
+ All cartridges are simply given the same internal medium identification ("DK", 65535).
+C Y15
+9.1.6.2.  System Files
++
+The space on a cartridge is allocated to actual files in 1pages0 of
+ 2 kbyte each (or 8 sectors).  The pages belonging to a file as
+well as its length and other information is stored in a file
+descriptor, which itself is stored in a file on the cartridge (file
+directory).  The local file names of all files on a cartridge are stored
+in another file on the cartridge (name directory).  When a cartridge is
+initialized, nine (system-)files  are allocated on the cartridge. These
+preallocated files can not be truncated or removed.
+ Except for the two directory files and the file containing the cartridge's bad sectors,
+all files can be read and written (modified).  The
+preallocated files are:
+- x25
+FS.FileDirectory File with file directory
+FS.FileDirectory.Back Back up of file directory (not implemented)
+FS.NameDirectory File with name directory
+FS.NameDirectory.Back Back up of file with name directory (not implemented)
+FS.BadPages File with unusable sectors
+PC.BootFile Normal boot file
+PC.BootFile.Back Alternate boot file
+PC.DumpFile File onto which the main memory (0 .. 64k-1) is dumped
+PC.Dump1File File onto which the main memory (64k .. 128k-1) is dumped
+C Y15
+9.1.6.3.  Error Handling
++
+Normally all detected errors are handled by assigning a
+1Response0 indicating the error to field 1res0 in the file variable.  Whenever a detected error
+cannot be related to a file or if a more serious error is detected, an error
+message is written on the display.  This is done according to the following format:
+-x25
+"- " module name [ "." procedure name ] ":" error indicating text
++
+1module name0 and 1procedure name0 are the names of the module and the procedure within the module, where the error was detected.  In the explanations of the messages, the
+following terms are used for inserted values:
+t175 350. x25
+1page number0 octal number (0 .. 137B) Page in an affected file
+1page0 octal number (0..167340B) Disk address of page = page DIV 13 * 8
+1file number0 octal number (0 .. 1377B) Number of the affected file
+1local file name0 string(1 .. 24) Local file name of affected file
+1response0 string Text describing the 1response0
+1statusbits0 octal number (177400 .. 177777B) Status from disk interface
+1disk address0 octal number (0 .. 111377B) "Logical" address of sector on disk
++
+If some of the following error messages are displayed, please consult
+the description of program 1DiskCheck0!
+= w15
+- DiskSystem.PutBuf: bad page: pageno = 1page number7 fno = 1file number7
++ x25 Y2
+Page indicates a disk address which is allocated to a "system file", but the
+file is not a "system file", or the page indicates a disk address for normal files, but
+the file is a "system file".
+= w15
+- DiskSystem.GetBuf: bad buffering while reading ahead
++ x25 Y2
+The disk address of a certain allocated sector was not found.
+= w15
+- DiskSystem.FileCommand: bad directory entry: fno = 1file number7 read fno = 1file number7
++ x25 Y2
+An inconsistency in the file directory was detected.
+= w15
+- DiskSystem.OpenVolume: bad page pointer:
+  fno = 1file number7 pageno = 1page number7  page = 1page7
++ x25 Y2
+An inconsistency in the file directory was detected during the initialisation of Medos.
+= w15
+- DiskSystem.(ReadName, WriteName or SearchName): bad file number in name entry
+  file name = 1local file name7
+  found fno = 1file number7, expected fno =  1file number7
++ x25 Y2
+An inconsistency in the name directory was detected.
+= w15
+- D140Disk:  soft timeout in wait
++ x25 Y2
+A disk operation was timed out by software.  This error occurs mainly, if the
+disk is switched off while a disk operation is processed.  Usually, this has no
+harmful consequences.
+= w15
+- D140Disk.DiskRead: 1response7
+-          diskadr = 1disk address7, statusbits = 1statusbits7
++ x25 Y2
+The driver detected an error, which did not disappear after three retries.
+= w15
+- D140Disk.DiskWrite: 1response7
+-          diskadr = 1disk address7, statusbits = 1statusbits7
++ x25 Y2
+The disk driver detected an error, which did not disappear after three retries.
+B c Y15
+W a r n i n g
++
+It must be mentioned here that
+among 1the best ways to get some of these error messages on the screen0 is
+this one:  Switch off the drive while a "harmless" program is running, exchange the cartridge
+in the drive, and switch on the drive again.  A cartridge exchange is simply 1not0
+detected by module DiskSystem which does 1not0, therefore, initialize its local
+information about the mounted cartridge from the new cartridge.
+p Ac
+9.2.  Module Program
+Cc
+Svend Erik Knudsen  15.5.82, rev. 7.10.82
+B Y20
+9.2.1.  Introduction
++
+A Modula-2 program consists of a 1main0 module and of all separate
+modules imported directly or indirectly by the main module.
+ Module 1Program0 provides facilities needed for the execution of
+Modula-2 programs upon Medos-2.  The definition module is given in chapter 9.2.2.
+ The program concept and explanations needed for the activation of a program
+are given in chapter 9.2.3.  The 1heap0 and two routines handling the
+heap are explained in chapter 9.2.4.  Possible error messages are listed in 9.2.5.
+ The object file format may be inspected in 9.2.6.
+B Y20
+9.2.2  Definition Module Program
+ = x 25
+DEFINITION MODULE Program;      (* Medos-2 V4  S. E. Knudsen  1.6.81 *)
+
+  FROM SYSTEM IMPORT ADDRESS;
+
+  EXPORT QUALIFIED
+    Call, Terminate, Status,
+    MainProcess,
+    CurrentLevel, SharedLevel,
+    AllocateHeap, DeallocateHeap;
+     
+  TYPE
+    Status = (normal,
+              instructionerr, priorityerr, spaceerr, rangeerr, addressoverflow,
+              realoverflow, cardinaloverflow, integeroverflow, functionerr,
+              halted, asserted, warned, stopped,
+              callerr, 
+              programnotfound, programalreadyloaded, modulenotfound,
+              codekeyerr, incompatiblemodule, maxspaceerr, maxmoduleerr, 
+              filestructureerr, fileerr,
+              loaderr);
+
+  PROCEDURE Call(programname: ARRAY OF CHAR; shared: BOOLEAN; VAR st: Status);
+  PROCEDURE Terminate(st: Status);
+
+  PROCEDURE MainProcess(): BOOLEAN; 
+  PROCEDURE CurrentLevel(): CARDINAL; 
+  PROCEDURE SharedLevel(): CARDINAL;
+ 
+  PROCEDURE AllocateHeap(quantum: CARDINAL): ADDRESS; 
+  PROCEDURE DeallocateHeap(quantum: CARDINAL): ADDRESS;
+
+END Program.
+ p B
+9.2.3.  Execution of Programs
++
+A Modula 1program0 consists of a 1main0 module and all separate modules
+imported directly and/or indirectly by the main module.  Within Medos-2, any 1running0
+program may activate another program just like a call of a procedure.
+ The calling program is suspended while the called program is running, and it is resumed,
+when the called program terminates.
+
+All active programs form a stack of activated programs. The first program in the stack
+is the resident part of the operating system, i.e. the (resident part of the)
+command interpreter together with all imported modules.  The topmost program in
+the stack is the currently running program.
+w250
+The figure illustrates, how programs may be activated.  At a certain moment,
+the 1dynamic activation level0 or simply the 1level0 identifies an active
+program in the stack. 
+
+Some essential differences exist, however, between programs and procedure activations.
+x25
+A program is identified by a computable 1program name0.
+
+The calling program is resumed, when a program terminates
+(exception handling).
+
+Resources like memory and connected files are owned by programs and are retrieved
+again, when the owning program terminates (resource management).
+
+A program can only be active once at the same time (programs are 1not0 reentrant).
+
+The code for a program is 1loaded0, when the program is activated and is removed, when
+the program terminates.
+x0
+A program is activated by a call to procedure 1Call0.
+ Whenever a program is activated, its main module is loaded from a file.  All directly
+or indirectly imported modules are also loaded from files, if they are not used by
+already active programs i.e. if they are not already loaded.  In the latter case, the
+just called program is 1bound0 to the already loaded modules.  This is analog to nested
+procedures, where the scope rules guarantee, that objects declared in an enclosing block
+may be accessed from an inner procedure.
+
+After the execution of a program, all its resources are returned.  The modules,
+which were loaded, when the program was activated, are removed again.
+
+The calling program may, by a parameter to 1Call0, specify that the called program
+shares resources with the calling program.  This means, that all sharable resources
+allocated by the called program actually are owned by the active program on the deepest
+activation level, which still shares resources with the currently running program.
+ The most common resources, namely
+dynamically allocated memory space (from the heap) and (connected) files,
+are sharable.
+ Any feature implemented by use of procedure variables can
+essentially not be sharable, since the code for an assigned routine may be removed,
+when the program containing it terminates.
+
+A program is identified by a 1program name0, which consists of an identifier or a
+sequence of identifiers separated by periods.  At most 16 characters are allowed for program names.  Capital and lower case letters are treated as being different.
+ = x25 t175.
+Program name = Identifier { "." Identifier } . / At most 16 characters/
+Identifier = Letter { Letter | Digit } .
++
+In order to find the 1object code file0, from which a program must be loaded,
+the program name
+is converted into a file name as follows:  The prefix 1DK.0 is inserted before the
+program name, and the extension 1.OBJ0 is appended.  If no such file exists, the
+prefix 1DK.0 is replaced by the prefix 1DK.SYS.0, and a second search is carried out.
+
+An object code file may contain the object code of several separate modules.
+ Imported but not already loaded modules are searched sequentially on
+the object code file,
+which the loader is just reading.
+
+Missing object code to imported modules is searched for like programs.  The (first 16
+characters of the) module name is converted to a file name by inserting 1DK.0 at
+the beginning of the module name and appending the extension 1.OBJ0 to it.  If the
+file is not found, a second search is made after the prefix 1DK.0 has been replaced by
+the prefix 1DK.LIB.0.  If the object code file is not yet found, the object code file
+for another missing module is searched.  This is tried once for all imported and still
+not loaded modules.
++ x25 t240.
+Program name 6directory0
+First searched file 6DK.directory.OBJ0 
+Second searched file 6DK.SYS.directory.OBJ0
+
+Module name 6Storage0
+First searched file 6DK.Storage.OBJ0
+Second searched file 6DK.LIB.Storage.OBJ0
++ w15
+Call(programname, shared, status)
+ + x25 Y2
+Procedure 1Call0 loads and starts the execution of program 1programname0.
+ If 1shared0 is TRUE,
+the called program shares (sharable) resources with the calling program.
+ The 1status0
+indicates if a program was executed successfully.
++ x25 t275.
+status = normal Program executed normally
+status in {instructionerr .. stopped} Some execution error detected
+status in {callerr .. loaderr} Some load error detected
+ + w15
+Terminate(status)
+ + x25 Y2
+The execution of a program may be terminated by a call to 1Terminate0.
+ The 1status0 given as parameter to 1Terminate0 is returned as status
+to the calling program.
+ + w15
+CurrentLevel(): CARDINAL
++ x25 Y2
+Function 1CurrentLevel0 returns the (dynamic activation) 1level0 of the
+running program.
+ + w15
+SharedLevel(): CARDINAL
++ x25 Y2
+Function 1SharedLevel0 returns the 1level0 of the lowest program, which
+shares resources with the current program.
+ + w15
+MainProcess(): BOOLEAN
+  + x25 Y2
+Function 1MainProcess0 returns TRUE if the currently executed coroutine (Modula-2
+PROCESS) is the one which executes the initialisation part of the main module in the
+running program.
+ + w15 f1
+Implementation Notes
++
+The current implementation of procedure 1Call0 may only be called from the 1main0
+coroutine, i.e. the coroutine within which function 1MainProcess0 returns TRUE.
+
+The module 1Storage0 may be loaded several times by module 1Program0.  This is the
+only exception to the rule, that a module may be loaded only once.  Module 1Storage0 may be loaded once for each set of shared programs (i.e. once for each heap).
+
+Only up to 96 modules may be loaded at any time.  The resident part of Medos-2
+consists of 13 modules.
+
+The loader can handle up to 40 already imported but not yet loaded modules.
+
+The maximum number of active programs is 16.
+ + w15 f1
+Related Program
++
+The program 1link0 collects the object code from several separate modules onto
+one single object code file.  1link0 enables the user to substitute interactively an object code file with a non-default file name.  "Linked" object code files might also be loaded faster and be more robust against changes and errors in the environment.
++ w15
+Example: Command Interpreter
+= x25
+MODULE Comint;        (* SEK  15.5.82 *)
+
+  FROM Terminal IMPORT Write, WriteString, WriteLn;
+  FROM Program IMPORT Call, Status;
+
+  CONST
+    programnamelength = 16;
+
+  VAR 
+    programname: ARRAY [0..programnamelength-1] OF CHAR;
+    st: Status;
+
+BEGIN
+  LOOP
+    Write('*');
+    (* read programname *)
+    Call(programname, TRUE, st);
+    IF st <> normal THEN
+      WriteLn;
+      WriteString("- some error occured"); WriteLn
+    END
+  END (* LOOP *)
+END Comint.
+B Y20
+9.2.4.  Heap
++
+The main memory of Lilith is divided into two parts, a stack and a heap.
+ The stack grows 
+from address 0 towards the 1stack limit0, and the heap area is
+allocated between the stack limit and the highest address
+of the machine (64k-1).  The stack and the heap are separated by the stack limit.
+
+The area between the actual 1top of stack0 and the stack limit is free and may
+be allocated for both the stack and the heap.
+
+Module 1Program0 handles the heap simply as a "reverse" stack, which may be
+enlarged by decrementing the stack limit address or reduced by incrementing
+it. This may be achieved by the routines 1AllocateHeap0 and
+1DeallocateHeap0.
+
+Whenever a program is called, an 1activation record0 for that program is pushed onto the stack.  Currently the activation record contains beside the "working stack" 1(main process)0 also the code and data for all modules loaded
+for the called program.  The activation record of the running program is limited at the high end by top of stack. 
+
+If the call is a 1shared0 call, i.e. if the parameter 1shared0 of procedure 1Call0 is set TRUE, nothing specially is made with the heap: The heap may grow and shrink as if no new program had been activated.  If the call is 1not shared0, however, (parameter 1shared0 set to FALSE) the current value of stack limit is saved, and a new heap is created for the program on the top
+of the previous heap, i.e. at stack limit.
+
+When a program terminates, its activation record is popped from the stack, and if the program is not shared with its calling program, its heap is released as well.
++ w15
+AllocateHeap(quantum): ADDRESS
+ + x25 Y2
+Function 1AllocateHeap0 allocates an area to the heap by decrementing
+1stack limit0 by 1MIN(available space, quantum)0.  The resulting
+stack limit is returned.
+ + w15
+DeallocateHeap(quantum): ADDRESS
+ + x25 Y2
+Function 1DeallocateHeap0 deallocates an area in the heap by incrementing
+1stack limit0 by 1MIN(size of heap, quantum)0.  The resulting
+stack limit is returned.
+ + w15 f1
+Implementation Note
++
+The current implementation of the functions 1AllocateHeap0 and
+1DeallocateHeap0 may only be called from the 1main0
+coroutine, i.e. the coroutine, within which function 1MainProcess0 returns TRUE.
+ + w15 f1
+Related Module
++
+Module 1Storage0 is normally used for the allocation and deallocation of variables
+referenced by pointers.  It maintains a list of free areas in the heap.
++ w15
+Examples:  Procedures ALLOCATE and DEALLOCATE
+= x25
+PROCEDURE ALLOCATE(VAR addr: ADDRESS; size: CARDINAL);
+  VAR top: ADDRESS;
+BEGIN
+  top := AllocateHeap(0);  (* current stack limit *)
+  addr := AllocateHeap(size);
+  IF top - addr < size THEN
+    top := DeallocateHeap(top - addr);
+    WriteString("- Heap overflow"); WriteLn;
+    Terminate(spaceerr)
+  END
+END ALLOCATE;
+
+PROCEDURE DEALLOCATE(VAR addr: ADDRESS; size: CARDINAL);
+BEGIN
+  addr := NIL
+END DEALLOCATE;
+ B Y20
+9.2.5.  Error Handling
++
+All detected errors are normally handled by returning an error indicating
+1Status0 to the caller of procedure 1Call0.  Some errors detected by the loader
+are also displayed on the screen in order to give the user more detailed
+information.  This is done according to the following format:
+= x25
+- Program.Call: 1error indicating text0
++
+The number of hyphens at the beginning of the message indicates the level
+of the called program.
+=w15
+- Program.Call:  incompatible module
+    '1module name7' on file '1file name7'
++ x25
+Imported module 1module name0 found on file 1file name0 has an unexpected module key.
+= w15
+- Program.Call:  incompatible module
+    '1module1 name7' imported by '1module2 name7' on file '1file name7'
++ x25
+Module 1module1 name0 imported by 1module2 name0 on file 1file name0
+has another key as the already loaded (or imported but not yet loaded)
+module with the same name.
+= w15
+- Program.Call:  module(s) not found:0
+    1module1 name0
+    1module2 name0
+    .
+    .
++ x25
+The listed modules were not found.
+B Y20
+9.2.6.  Object Code Format
++
+The format of the object code file generally has the following syntax:
+- x25 t170 180.
+LoadFile    =  { Frame }.
+Frame       =  FrameType FrameSize { FrameWord }.
+FrameType   =  "200B" | "201B" | .... | "377B".
+FrameSize   =  Number.  /number of FrameWords/
+FrameWord   =  Number.
++
+The load file is a word file.
+ 1FrameType0 and 1Number0 are each represented in one word.
+
+The object code file obeys a syntactic structure, called 1ObjectFile0.
+- x25 t170 180.
+ObjectFile  =  Module { Module } .
+Module  =  [ VersionFrame ] HeaderFrame [ ImportFrame ] 
+             { ModuleCode | DataFrame }.
+VersionFrame  =  VERSION FrameSize VersionNumber.
+FrameSize  =  Number. 
+VersionNumber  =  Number.
+HeaderFrame  =  MODULE FrameSize ModuleName DataSize [ CodeSize Flags ]. 
+ModuleName  =  ModuleIdent ModuleKey.
+ModuleIdent  =  Letter { Letter | Digit } { "0C" }.   /exactly 16 characters/
+ModuleKey  =  Number Number Number.
+DataSize  =  Number.   /in words/
+CodeSize  =  Number.   /in words/
+Flags  =  Number.
+ImportFrame  =  IMPORT FrameSize {ModuleName}.
+ModuleCode  =  CodeFrame [ FixupFrame ].
+CodeFrame  =  CODETEXT FrameSize WordOffset { CodeWord }.
+WordOffset  =  Number.     /in words from the beginning of the module/
+CodeWord  =  Number.
+FixupFrame  =  FIXUP FrameSize {ByteOffset}.
+ByteOffset  =  Number.     /in bytes from the beginning of the module/
+DataFrame  =  DATATEXT FrameSize WordOffset { DataWord }.
+DataWord  =  Number.
+VERSION  =  "200B".
+MODULE  =  "201B".
+IMPORT  =  "202B".
+CODETEXT  =  "203B".
+DATATEXT  =  "204B".
+FIXUP  =  "205B"
++ n
+Currently the 1VersionNumber0 is equal to 3.
+Currently the 1Flags0 are set to 0.
++
+The 1ByteOffsets0 in 1FixupFrame0 point to bytes in the code containing 1local0 module numbers.  The local module numbers must be replaced by the 1actual0 numbers
+of the corresponding modules.  Local module number 0 stands for the module itself, local module number i (i > 0) stands for the i'th module in the 1ImportFrame0.
+
+A program is activated by a call to procedure 0 of its main module.
+p B
+9.3.  Storage
++
+Svend Erik Knudsen  15.5.82
+ + w15
+Calls to the Modula-2 standard procedures NEW and DISPOSE are translated into calls to ALLOCATE and DEALLOCATE,
+procedures which are either explicitly programmed or imported from 
+a separate module (see Modula-2 report in [1], chapter 10.2).
+ The standard way of doing this
+is to import ALLOCATE and/or DEALLOCATE from
+module Storage.
+ = w15
+DEFINITION MODULE Storage;   (* Medos-2 V4  1.6.81  S. E. Knudsen *)
+
+  FROM SYSTEM IMPORT ADDRESS;
+
+  EXPORT QUALIFIED ALLOCATE, DEALLOCATE, Available;
+
+  PROCEDURE ALLOCATE(VAR a: ADDRESS; size: CARDINAL);
+  PROCEDURE DEALLOCATE(VAR a: ADDRESS; size: CARDINAL);
+  PROCEDURE Available(size: CARDINAL): BOOLEAN;
+
+END Storage.
++ w15 f1
+Explanations
++
+ALLOCATE(addr, size)
+x25 Y2
+Procedure 1ALLOCATE0 allocates an area of the given size and assigns
+its address to 1addr0.  If no space is available, the calling program is killed.
++ w15
+DEALLOCATE(addr, size)
+x25 Y2
+Procedure 1DEALLOCATE0 frees the area with the given size at address 1addr0.
++ w25
+Available(size): BOOLEAN
+x25 Y2
+Function 1Available0 returns TRUE if an area of the given size is available.
++ w15 f1
+Example
+= x25
+MODULE StorageDemo;      (* SEK  15.5.82 *)
+
+  FROM Storage IMPORT ALLOCATE;
+
+  TYPE
+    Pointer = POINTER TO Element;
+    Element = RECORD next: Pointer; value: INTEGER END;
+
+  VAR  root: Pointer;
+
+  PROCEDURE NewInteger(i: INTEGER);
+    VAR p: Pointer;
+  BEGIN
+    NEW(p);    (* implicit call to ALLOCATE *)
+    p^.next := root; p^.value := i;
+    root := p
+  END NewInteger;
+
+BEGIN
+  root := NIL;
+  (* ... *)
+END StorageDemo.
++ w15 f1
+w15 f1
+Restrictions
++ x25
+The behaviour of the given implementation is only defined, 
+if its procedures are (directly or indirectly) activated
+by the main program (and not from one of its coroutines).
+
+1DEALLOCATE0 checks only roughly the validity of the call.
+
+Module 1Storage0 can only handle the heap for the running program.  Other heaps created for programs not sharing the heap with the running program can not be handled by module 1Storage0 (see module 1Program0, chapter 9.2.).
++ w15 f1
+Loading of Module Storage
++ x25
+Module 1Storage0 may be loaded once for each heap it should handle.  For more details see module 1Program0, chapter 9.2.
++ w15 f1
+Error Messages
+= x25
+- Storage.ALLOCATE: heap overflow 
+- Storage.ALLOCATE: not shared ALLOCATE 
+- Storage.DEALLOCATE: bad pointer 
++ w15 f1
+Imported Modules
++ f1 n x25
+SYSTEM
+Program
+Terminal
++ w15 f1
+Algorithms
++ x25
+Procedure1Storage0 maintains a list of available areas
+sorted by addresses in the heap.
+ When an element has to be allocated, the list is searched from
+the highest towards lower addresses for a large enough available area.
+ If such an area is found, the needed memory space is allocated
+in that area (first fit algorithm). Otherwise 1Storage0 tries to get more
+memory space allocated from module 1Program (Program.AllocateHeap)0.
+
+Procedure 1DEALLOCATE0 inserts the deallocated area into the sorted list
+of available areas.  Adjacent available areas are collapsed 
+during the insertion.
+p B
+9.4.  Terminal
++
+Svend Erik Knudsen  15.5.82
++ w15
+Module 1Terminal0 provides the routines normally used for reading from the keyboard (or a commandfile) and for the sequential writing of text on the screen.
+= w15
+DEFINITION MODULE Terminal;         (* Medos-2 V4  S. E. Knudsen  1.6.81 *)
+
+  EXPORT QUALIFIED
+    Read, BusyRead, ReadAgain,
+    Write, WriteString, WriteLn;
+
+  PROCEDURE Read(VAR ch: CHAR);
+  PROCEDURE BusyRead(VAR ch: CHAR);
+  PROCEDURE ReadAgain;
+
+  PROCEDURE Write(ch: CHAR);
+  PROCEDURE WriteString(string: ARRAY OF CHAR);
+  PROCEDURE WriteLn;
+
+END Terminal.
++ w15 f1
+Explanations
++
+Read(ch)
++ x25 Y2
+Procedure 1Read0 gets the next character from the keyboard (or the commandfile) and assigns it to 1ch.0  Lines are terminated with character 36C (=1eol0, RS).  The procedure 1Read0 does not "echoe" the read character on the screen.
++ w15
+BusyRead(ch)
++ x25 Y2
+Procedure 1BusyRead0 assigns 0C to 1ch0 if no character has been typed.  Otherwise procedure 1BusyRead0 is identical to procedure 1Read0.
++ w15
+ReadAgain
++ x25 Y2
+A call to 1ReadAgain0 prevents the next call to 1Read0 or 1BusyRead0 from getting the next typed character.  Instead, the last character read before the call to 1ReadAgain0 will be returned again.
++ w15
+Write(ch)
++ x25 Y2
+Procedure 1Write0 writes the given character on the screen at its current writing position.  The screen scrolls, if the writing position reaches its end.  Besides the following lay-out characters, it is left undefined what happens, if non printable ASCII characters and non ASCII characters are written out.
++ x25 t 100 150.
+eol 36C Sets the writing position at the beginning of the next line
+CR 15C Sets the writing position at the beginning of the current line
+LF 12C Sets the writing position to the same column in the next line
+FF 14C Clears the screen and sets the writing position into its upper left corner
+BS 10C Sets the writing position one character backward
+DEL 177C Sets the writing position one character backward and erases the character there
++ w15
+WriteString(string)
++ x25 Y2
+Procedure 1WriteString0 writes out the given string.  The string may be terminated with character 0C.
++ w15
+WriteLn
++ x25 Y2
+A call to procedure 1WriteLn0 is equivalent to the call 1Write(eol)0.

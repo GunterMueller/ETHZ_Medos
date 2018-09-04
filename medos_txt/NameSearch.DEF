@@ -1,0 +1,21 @@
+DEFINITION MODULE NameSearch;         (* LG 18.08.82 *)
+
+  EXPORT QUALIFIED FindNames, NextName;
+
+  PROCEDURE FindNames(device, searched: ARRAY OF CHAR; uplowEqual: BOOLEAN);
+
+    (* Initialise searching on 'device' for file names   *)
+    (* matching 'searched', which may contain wildcard   *)
+    (* symbols. 'uplowEqual' handles matching of capital *)
+    (* and lowercase letters.                            *)
+
+  PROCEDURE NextName(VAR ok: BOOLEAN; VAR found: ARRAY OF CHAR;
+                     VAR fileNo, versionNo: CARDINAL);
+
+    (* Search next name according to values initialised  *)
+    (* by a call of procedure 'FindNames'.               *)
+    (* 'ok' indicates successful searching, 'found' is   *)
+    (* the found name, 'fileNo' and 'versionNo' the      *)
+    (* corresponding file information.                   *)
+
+END NameSearch.

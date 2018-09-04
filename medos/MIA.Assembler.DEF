@@ -1,0 +1,1 @@
+(******************************************************************      Asssembler for one Micro-Instruction / Part of      ******      MIA / Version 19 / 20.07.81 / G. Schild             ******************************************************************)DEFINITION MODULE Assembler;EXPORT QUALIFIED GetAnInstr;PROCEDURE GetAnInstr(line:ARRAY OF CHAR);END Assembler.

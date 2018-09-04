@@ -1,0 +1,90 @@
+DEFINITION MODULE EditWindows; (* vs I.11           NW 6.12.79, WW 22.2.82
+                  ===========  *)
+
+  FROM EditFiles IMPORT FileNo;
+
+  EXPORT QUALIFIED  
+    TraceCursor, selected, Deselect,
+    StartSelection, ContinueSelection, StopSelection,
+    SetBar, RemoveBar, LastLine, MoveBar, LetBar, windowOK, windowCount, 
+    WindowType, GetTypeAndName, AlreadyWritten, FileNameNew,
+    OpenWindow, ClearDocument, RemoveDocument, OpenDocument, CloseWindow, 
+    PutDocument, BackupDocument,ScrollUp, ScrollDown, Flip,
+    Backspace, Insert, InsertLine, ReadBuffer, Find,
+    InsertSection, DeleteSection, Move, SaveSection, InitEditWindows;
+ 
+  TYPE
+    WindowType = (TopWindow, SubWindow, DocWindow);
+
+  VAR 
+    selected, windowOK: BOOLEAN;
+    windowCount: CARDINAL;
+ 
+  PROCEDURE TraceCursor;
+
+  PROCEDURE SetBar (barType: CARDINAL);
+
+  PROCEDURE RemoveBar;
+
+  PROCEDURE OpenWindow;
+
+  PROCEDURE ClearDocument;
+
+  PROCEDURE RemoveDocument;
+
+  PROCEDURE OpenDocument (f: FileNo; fl: CARDINAL);
+ 
+  PROCEDURE LastLine(): BOOLEAN;
+
+  PROCEDURE MoveBar;
+
+  PROCEDURE LetBar;
+
+  PROCEDURE GetTypeAndName (VAR type: WindowType; VAR fN: ARRAY OF CHAR);
+
+  PROCEDURE AlreadyWritten (fN: ARRAY OF CHAR): BOOLEAN;
+
+  PROCEDURE FileNameNew (fN: ARRAY OF CHAR): BOOLEAN;
+
+  PROCEDURE CloseWindow;
+ 
+  PROCEDURE BackupDocument(VAR ok: BOOLEAN);
+
+  PROCEDURE PutDocument(VAR ok: BOOLEAN);
+
+  PROCEDURE ScrollUp;
+
+  PROCEDURE ScrollDown;
+
+  PROCEDURE Flip;
+
+  PROCEDURE Deselect;
+
+  PROCEDURE StartSelection;
+
+  PROCEDURE ContinueSelection (button: CARDINAL);
+
+  PROCEDURE StopSelection;
+
+  PROCEDURE Backspace;
+
+  PROCEDURE Insert (ch: CHAR);
+
+  PROCEDURE InsertLine;
+
+  PROCEDURE InsertSection;
+
+  PROCEDURE Move;
+
+  PROCEDURE DeleteSection;
+
+  PROCEDURE SaveSection;
+
+  PROCEDURE ReadBuffer (VAR s: ARRAY OF CHAR; VAR length: CARDINAL);
+
+  PROCEDURE Find (s: ARRAY OF CHAR; length: CARDINAL;
+                  VAR found: BOOLEAN);
+
+  PROCEDURE InitEditWindows;
+
+END EditWindows.
